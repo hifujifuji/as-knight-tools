@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>天啟症候群・騎士戰鬥計算機</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #f5f1eb;
+            --surface: #ffffff;
+            --surface-alt: #e8e4dc;
+            --text: #1a1a1a;
+            --text-muted: #666;
+            --border: #1a1a1a;
+            --border-light: #ccc;
+            --positive: #2e6e4e;
+            --negative: #8a3030;
+        }
+
+        :root[data-theme="dark"] {
+            --bg: #1c1a17;
+            --surface: #262320;
+            --surface-alt: #2e2b27;
+            --text: #e8e4dc;
+            --text-muted: #9a958c;
+            --border: #e8e4dc;
+            --border-light: #45413b;
+            --positive: #7fc8a0;
+            --negative: #d98f8f;
+        }
+
+        body {
+            font-family: "Noto Sans TC", sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+            font-size: 14px;
+        }
+
+        body::after {
+            content: '';
+            position: fixed; inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+            opacity: 0.04; pointer-events: none; z-index: 99999;
+        }
+
+        h1 { font-size: 18px; letter-spacing: 2px; }
+
+        /* ===== 頂列：設定檔 ===== */
+        .topbar {
+            display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        .topbar .spacer { flex: 1; }
+
+        select, input[type="text"], input[type="number"] {
+            padding: 5px 8px;
+            border: 1px solid var(--border-light);
+            background: var(--surface);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 13px;
+        }
+        input[type="number"] { width: 56px; }
+        input:focus, select:focus { outline: 2px solid var(--border); outline-offset: -2px; }
+
+        button {
+            padding: 5px 12px;
+            border: 1px solid var(--border-light);
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        button:hover { background: var(--surface-alt); }
+        button.primary { border-color: var(--border); font-weight: 600; }
+
+        /* ===== 主版面 ===== */
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(360px, 5fr) minmax(420px, 6fr);
+            gap: 14px;
+            align-items: start;
+            max-width: 1500px;
+            margin: 0 auto;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border-light);
+            margin-bottom: 14px;
+        }
+
+        .panel-title {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-light);
+            background: var(--surface-alt);
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        .panel-body { padding: 12px 14px; }
+
+        details { border-bottom: 1px solid var(--border-light); }
+        details:last-child { border-bottom: none; }
+        summary {
+            padding: 9px 14px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            background: var(--surface);
+            list-style: none;
+            user-select: none;
+        }
+        summary::before { content: '▶ '; font-size: 10px; color: var(--text-muted); }
+        details[open] > summary::before { content: '▼ '; }
+        summary:hover { background: var(--surface-alt); }
+        .details-body { padding: 8px 14px 12px; }
+
+        /* ===== 能力值 ===== */
+        .ability-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+        .ability-cell { text-align: center; }
+        .ability-cell label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 3px; }
+        .ability-cell input { width: 100%; text-align: center; font-size: 16px; font-weight: 600; }
+
+        .select-row {
+            display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px;
+            font-size: 13px; align-items: center;
+        }
+        .select-row label { color: var(--text-muted); }
+
+        /* ===== 效果列表 ===== */
+        .effect-item {
+            display: flex; align-items: flex-start; gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px dashed var(--border-light);
+        }
+        .effect-item:last-child { border-bottom: none; }
+        .effect-item input[type="checkbox"], .effect-item input[type="radio"] { margin-top: 3px; flex-shrink: 0; }
+        .effect-main { flex: 1; min-width: 0; }
+        .effect-name { font-weight: 600; font-size: 13px; }
+        .effect-meta {
+            font-size: 11px; color: var(--text-muted);
+            font-family: monospace; margin-left: 6px;
+        }
+        .effect-desc { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; white-space: pre-line; }
+        .effect-item.builtin { opacity: 1; }
+        .effect-item.builtin .effect-name::after { content: ' 〔內建〕'; font-size: 11px; color: var(--positive); font-weight: 400; }
+        .effect-tag {
+            display: inline-block; font-size: 10px; padding: 0 5px;
+            border: 1px solid var(--border-light); color: var(--text-muted);
+            margin-left: 6px; vertical-align: 1px;
+        }
+
+        .fate-status { font-size: 13px; padding: 6px 14px; background: var(--surface-alt); border-bottom: 1px solid var(--border-light); }
+        .fate-status.over { color: var(--negative); font-weight: 700; }
+
+        /* ===== 戰鬥輸出 ===== */
+        .output-panel {
+            background: var(--surface);
+            border: 2px solid var(--border);
+            margin-bottom: 14px;
+            position: sticky;
+            top: 10px;
+            z-index: 50;
+        }
+        .output-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .output-block { padding: 14px; text-align: center; }
+        .output-block + .output-block { border-left: 1px solid var(--border-light); }
+        .output-label { font-size: 11px; color: var(--text-muted); letter-spacing: 2px; }
+        .output-value { font-size: 30px; font-weight: 700; font-family: monospace; margin: 4px 0; }
+        .output-sub { font-size: 11px; color: var(--text-muted); }
+        .copy-btn { margin-top: 6px; font-size: 11px; padding: 3px 10px; }
+
+        .output-stats {
+            display: flex; flex-wrap: wrap; gap: 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .stat-cell {
+            flex: 1; min-width: 70px; text-align: center; padding: 8px 4px;
+            border-right: 1px solid var(--border-light);
+        }
+        .stat-cell:last-child { border-right: none; }
+        .stat-cell .v { font-size: 17px; font-weight: 700; font-family: monospace; }
+        .stat-cell .k { font-size: 10px; color: var(--text-muted); }
+
+        .breakdown { padding: 8px 14px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+        .breakdown b { color: var(--text); }
+        .breakdown .pos { color: var(--positive); }
+        .breakdown .neg { color: var(--negative); }
+
+        .notes-list { padding: 8px 14px; font-size: 12px; line-height: 1.6; border-top: 1px solid var(--border-light); }
+        .notes-list li { margin-left: 18px; }
+        .notes-list .note-src { font-weight: 600; }
+
+        /* ===== 狀態列表 ===== */
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px 14px;
+        }
+        .status-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 0; font-size: 13px;
+            position: relative;
+        }
+        .status-item .s-name { cursor: help; border-bottom: 1px dotted var(--border-light); }
+        .status-item .s-name.negative { color: var(--negative); }
+        .status-item .s-name.positive { color: var(--positive); }
+        .status-item input[type="number"] { width: 44px; padding: 2px 4px; font-size: 12px; }
+        .status-tooltip {
+            display: none;
+            position: absolute; left: 0; top: 100%;
+            z-index: 200; width: 280px;
+            background: var(--surface); border: 1px solid var(--border);
+            padding: 8px 10px; font-size: 12px; line-height: 1.5;
+            white-space: pre-line;
+            box-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+        }
+        .status-item:hover .status-tooltip { display: block; }
+
+        /* ===== 回合效果／手動調整 ===== */
+        .turn-row {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            padding: 5px 0; border-bottom: 1px dashed var(--border-light);
+            font-size: 13px;
+        }
+        .turn-row:last-child { border-bottom: none; }
+        .turn-row .t-meta { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+        .turn-row .t-effect { font-size: 11px; color: var(--positive); font-family: monospace; }
+        .turn-row input[type="number"] { width: 50px; padding: 2px 4px; }
+        .turn-row select { padding: 2px 4px; font-size: 12px; }
+
+        .manual-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+        }
+        .manual-cell label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+        .manual-cell input { width: 100%; }
+
+        .reset-turn-btn { width: 100%; margin-top: 10px; padding: 8px; font-weight: 600; }
+
+        .hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--text); }
+        ::selection { background: var(--text); color: var(--bg); }
+
+        @media (max-width: 1000px) {
+            .layout { grid-template-columns: 1fr; }
+            .output-panel { position: static; }
+            .status-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>騎士戰鬥計算機</h1>
+        <span class="spacer"></span>
+        <label>設定檔</label>
+        <select id="profileSelect" onchange="switchProfile(this.value)"></select>
+        <input type="text" id="charName" placeholder="角色名稱" style="width:130px" oninput="onNameInput(this.value)">
+        <button onclick="newProfile()">新增</button>
+        <button onclick="duplicateProfile()">複製</button>
+        <button onclick="deleteProfile()">刪除</button>
+        <button onclick="exportProfiles()">匯出</button>
+        <button onclick="importProfiles()">匯入</button>
+    </div>
+
+    <div class="layout">
+        <!-- ===== 左欄：角色構築 ===== -->
+        <div class="col-build">
+            <div class="panel">
+                <div class="panel-title">能力值與基本設定</div>
+                <div class="panel-body">
+                    <div class="ability-grid" id="abilityGrid"></div>
+                    <div class="select-row">
+                        <span><label>命中能力　</label><select id="hitAbilitySel" onchange="setKey('hitAbility', this.value)"></select></span>
+                        <span><label>迴避能力　</label><select id="dodgeAbilitySel" onchange="setKey('dodgeAbility', this.value)"></select></span>
+                        <span><label>命運點　</label><input type="number" id="fateInput" min="0" onchange="setNum('fate', this.value)"></span>
+                        <span><label>行動力　</label><input type="number" id="apInput" min="0" onchange="setNum('ap', this.value)"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">本質　<span id="essenceStatsLabel" style="font-weight:400;font-size:12px;color:var(--text-muted)"></span></div>
+                <div class="panel-body" style="padding-bottom:6px">
+                    <select id="essenceSel" onchange="setEssence(this.value)" style="width:100%"></select>
+                </div>
+                <div id="essenceContent"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">型態　<span id="formStatsLabel" style="font-weight:400;font-size:12px;color:var(--text-muted)"></span></div>
+                <div class="panel-body" style="padding-bottom:6px">
+                    <select id="formSel" onchange="setForm(this.value)" style="width:100%"></select>
+                    <div class="select-row">
+                        <span><label>傷害能力　</label><select id="dmgAbilitySel" onchange="setKey('dmgAbility', this.value)"></select></span>
+                    </div>
+                </div>
+                <div id="formContent"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">戰鬥特技</div>
+                <div class="panel-body">
+                    <select id="featSel" onchange="setKey('feat', this.value)" style="width:100%"></select>
+                    <div class="effect-desc" id="featDesc" style="margin-top:6px"></div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-title">紋章（持有）</div>
+                <details>
+                    <summary>從紋章表選擇</summary>
+                    <div class="details-body" id="emblemOwnList"></div>
+                </details>
+            </div>
+        </div>
+
+        <!-- ===== 右欄：戰鬥面板 ===== -->
+        <div class="col-battle">
+            <div class="output-panel">
+                <div class="output-main">
+                    <div class="output-block">
+                        <div class="output-label">命中</div>
+                        <div class="output-value" id="hitOutput">2D6+0</div>
+                        <div class="output-sub" id="hitSub"></div>
+                        <button class="copy-btn" onclick="copyOutput('hit', event)">複製</button>
+                    </div>
+                    <div class="output-block">
+                        <div class="output-label">傷害</div>
+                        <div class="output-value" id="dmgOutput">1D6+0</div>
+                        <div class="output-sub" id="dmgSub"></div>
+                        <button class="copy-btn" onclick="copyOutput('dmg', event)">複製</button>
+                    </div>
+                </div>
+                <div class="output-stats" id="statCells"></div>
+                <div class="breakdown" id="breakdown"></div>
+                <ul class="notes-list" id="notesList" style="display:none"></ul>
+            </div>
+
+            <div class="panel">
+                <details>
+                    <summary>持有效果速查</summary>
+                    <div class="details-body" id="ownedSummary"></div>
+                </details>
+                <details open>
+                    <summary>本回合使用的效果</summary>
+                    <div class="details-body" id="turnEffects"></div>
+                </details>
+                <details open>
+                    <summary>狀態（自身）</summary>
+                    <div class="details-body">
+                        <div class="status-grid" id="statusGrid"></div>
+                    </div>
+                </details>
+                <details>
+                    <summary>紋章</summary>
+                    <div class="details-body" id="emblemList"></div>
+                </details>
+                <details>
+                    <summary>手動調整</summary>
+                    <div class="details-body">
+                        <div class="manual-grid" id="manualGrid"></div>
+                        <div class="hint" style="margin-top:8px">無法自動換算的效果（如獸王當千的每敵加值、炎之魔劍的終極傷害）請使用手動調整。</div>
+                    </div>
+                </details>
+            </div>
+            <button class="reset-turn-btn" onclick="resetTurn()">回合結束（清除本回合效果、紋章與手動調整）</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 資料庫：本質
+        // 欄位說明：
+        //   passive: 持有即生效的數值修正 { hit, dodge, support, dmgDice, dmgFlat, rangeMax, hp }
+        //   turn:    本回合勾選使用的效果 { hit, adv, dis, dmgDice, dmgFlat, abilityAdd:[能力選項],
+        //            input:{label, mult:'ability'|'dice'|'flat'}, note }
+        //   special: 需特殊處理的效果代碼
+        //   note:    持有或使用時顯示於結算提醒的文字
+        // ============================================================
+        const ABILITIES = ['體能', '反應', '心智', '社交'];
+
+        const ESSENCES = {
+            '貝西摩斯': {
+                hit: 0, dodge: 0, support: -2, hp: 40,
+                talents: [
+                    { name: '野獸統馭', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以直覺與動物溝通，理解動物的想法。你可以用這個能力詢問動物問題，但動物會受限於自己的觀點和智力來理解你的問題並給予你回答。你也可以給予動物簡單的號令，只要不是明顯對自己有害、且牠們的智力足以理解的命令牠們都會聽從，有必要時GM會要求社交判定。' },
+                    { name: '超人之力', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以展現出超人般的怪力，讓你能做出諸如拉住行進中的車輛或舉起水泥護欄等行動，有必要時GM會要求體能判定。' }
+                ],
+                builtins: [
+                    { name: '能力強化', timing: '常駐', cost: '–', desc: '選擇一個能力值，在呼喚出天啟武裝的期間，你的該能力值+2。', special: 'buffAbility' }
+                ],
+                extras: [
+                    { name: '強化專精', timing: '常駐', cost: '–', desc: '你的能力強化效果改為你所選擇的能力值+3。', special: 'buffUpgrade' },
+                    { name: '獸王當千', timing: '常駐', cost: '–', desc: '你所在的區域每有一個敵人，你的攻擊傷害就+2，如果你所在的區域敵人具有BOSS特性，你的攻擊傷害額外+6。', turn: { input: { label: '同區域敵人數', mult: 'flat', per: 2 }, note: '同區域有BOSS特性敵人時，傷害額外+6（用手動調整）。' } },
+                    { name: '能力爆發', timing: '你的回合', cost: '1 行動力', desc: '直到你下回合開始，任意一個能力值+3。', turn: { abilityBuff: 3 } },
+                    { name: '震地跺', timing: '你的回合', cost: '1 行動力', desc: '和你同區域的所有敵人受到1D6傷害，並得到【暈眩】。', turn: { note: '同區域所有敵人受到1D6傷害並得到【暈眩】（另行擲骰）。' } },
+                    { name: '獸王的號召', timing: '任意', cost: '1 行動力', desc: '將至多三個位在你鄰接區域的敵人移動到你所在的區域。', turn: { note: '至多三個鄰接區域敵人移動至你所在區域。' } },
+                    { name: '獸王的反擊', timing: '被攻擊時', cost: '1 行動力', desc: '你立刻對攻擊者進行一次攻擊，該次攻擊不可使用任何其他需消耗行動力的效果。', turn: { note: '反擊時不可使用其他需消耗行動力的效果。' } },
+                    { name: '獸王加冕', timing: '你的回合', cost: '–', desc: '戰鬥中你或隊友合計打倒 6 個以上的敵人後，或戰場上只剩下一個敵人時可以使用，直到你的下回合開始，你的所有基本能力值+4。此效果一場戰鬥只能使用一次。', turn: { allAbilityBuff: 4, note: '一場戰鬥只能使用一次。' } },
+                    { name: '獸王的諭令', timing: '進行攻擊時', cost: '–', desc: '戰鬥中你或隊友合計打倒 6 個以上的敵人後，或戰場上只剩下一個敵人時可以使用，你和你的隊友在本戰鬥中每合計打倒兩個敵人，你本回合就可以額外攻擊 1 次，這些額外攻擊不能使用任何需要支付行動力的效果。', turn: { note: '每合計打倒兩敵額外攻擊1次，額外攻擊不可用需行動力的效果。' } }
+                ]
+            },
+            '利維坦': {
+                hit: 0, dodge: 0, support: 2, hp: 50,
+                talents: [
+                    { name: '支配水域', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以自由控制你身邊的水——例如讓噴水池變成噴向特定目標的高壓水柱、讓游泳池的水變成衝過街道的波滔，GM認為必要時可以要求反應判定。' },
+                    { name: '鋼鐵之軀', timing: '非戰鬥', cost: '1 關鍵字', desc: '能殺死一半人的情境——例如被車輛高速撞擊、闖入火場、被埋在倒塌的大樓底下等對你而言只是小菜一碟，你可以在任何正常人會受重傷甚至死亡的狀況下毫髮無傷，GM認為有必要時可以要求體能判定。' }
+                ],
+                builtins: [
+                    { name: '掩護', timing: '見內文', cost: '1 行動力', desc: '每當和你距離一區域內的隊友被攻擊命中時，你可以消耗一點行動力，取消隊友所受到的傷害並改為由你受到傷害。' }
+                ],
+                extras: [
+                    { name: '本能掩護', timing: '常駐', cost: '–', desc: '一戰鬥輪僅限一次，你的掩護能力可不消耗行動力使用。' },
+                    { name: '噬血強化', timing: '常駐', cost: '–', desc: '每當你因為掩護而受到傷害時，你的下一個攻擊判定獲得【優勢 1】，此效果可以累計。', turn: { input: { label: '累計次數', mult: 'adv' } } },
+                    { name: '高速再生', timing: '常駐', cost: '–', desc: '戰鬥開始時你得到【再生 2D6】，如果你因故失去此效果，你可以在你的回合開始時花費 1 點AP重新獲得。', note: '戰鬥開始時得到【再生 2D6】。' },
+                    { name: '鐵壁', timing: '你的回合', cost: '1 行動力', desc: '直到你下回合開始，你得到【減傷 5】。', turn: { note: '直到下回合開始得到【減傷 5】。' } },
+                    { name: '吞噬傷痕', timing: '你的回合', cost: '1 行動力', desc: '立刻解除你和同區域任意數量同伴身上的一個負面狀態。', turn: { note: '解除你與同區域同伴身上的一個負面狀態。' } },
+                    { name: '饑餓啃咬', timing: '攻擊命中時', cost: '1 行動力', desc: '你回復同等於你所造成傷害的一半耐久值。', turn: { note: '命中後回復傷害一半的耐久值。' } },
+                    { name: '末日的鐘響', timing: '你的回合', cost: '–', desc: '當你在一場戰鬥中掩護到達三次以後可以使用，使用後從以下效果擇一：①你獲得本戰鬥中你的掩護次數點行動力 ②你下一次攻擊傷害+【本戰鬥中你的掩護次數D6】。', turn: { input: { label: '掩護次數（選②時）', mult: 'dice' }, note: '掩護達三次後可用，擇一：①獲得掩護次數點行動力 ②下一次攻擊傷害+掩護次數D6。' } },
+                    { name: '敵意吞食者', timing: '見內文', cost: '–', desc: '當你和你的隊友同時受到來自同一來源的傷害時，你可以取消所有隊友受到的傷害，改為你自身承受兩倍傷害，此效果一場戰鬥只能使用一次。' }
+                ]
+            },
+            '席茲': {
+                hit: 0, dodge: 2, support: -1, hp: 25,
+                talents: [
+                    { name: '神速奔馳', timing: '非戰鬥', cost: '1 關鍵字', desc: '你的奔跑速度足以追上高速奔馳的汽車。你可以用時速90公里的速度持續奔跑至多一分鐘，GM認為有必要時可以要求體能判定。' },
+                    { name: '喚風之手', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以隨心所欲呼喚風，呼喚的風力從微風到如同颱風的強度可以自由控制，GM認為有必要時可以要求反應判定。' }
+                ],
+                builtins: [
+                    { name: '翔空之翼', timing: '常駐', cost: '–', desc: '你的回合開始時，自動獲得飛行狀態。\n消耗行動力進行額外移動時，每消耗一點行動力改為至多移動兩個區域。', note: '回合開始時自動獲得【飛行】（記得勾選狀態）。' }
+                ],
+                extras: [
+                    { name: '加速攻擊', timing: '常駐', cost: '–', desc: '如果你本回合移動過，你的攻擊判定得到【優勢 1】。', turn: { adv: 1, label: '本回合移動過' } },
+                    { name: '一擊脫離', timing: '常駐', cost: '–', desc: '你可以在攻擊前後都進行移動。', note: '可在攻擊前後都進行移動。' },
+                    { name: '天空之王', timing: '常駐', cost: '–', desc: '當你在飛行狀態時，你的判定只要擲出5或以上就視為強擊。', flightNote: '天空之王：飛行中擲出5+視為強擊。' },
+                    { name: '神速瞬閃', timing: '任意', cost: '1 行動力', desc: '你立刻移動至多兩區域，如果你在被攻擊時使用此效果，該攻擊對你的攻擊判定額外受到【劣勢 1】，這個劣勢可以和其他已有的劣勢疊加。' },
+                    { name: '風之盾', timing: '見內文', cost: '1 行動力', desc: '只能在飛行狀態使用，敵人攻擊你或距離你一格內的隊友時，該次攻擊傷害無法擲骰，直接取最小值。' },
+                    { name: '俯衝攻擊', timing: '攻擊時', cost: '1 行動力', desc: '只能在飛行狀態使用，你本次攻擊傷害+2D6，使用後解除飛行狀態。', turn: { dmgDice: 2, note: '使用後解除【飛行】。' } },
+                    { name: '啟示錄之翼', timing: '你的回合', cost: '–', desc: '你在本次戰鬥中合計移動超過7區域後可以使用，本回合你可以進行額外最多7區域的移動而不需要消耗行動力。本回合你只要移動到有敵人的區域，就對該區域所有敵人造成1D6傷害，可以反覆進出同一區域，多次給予傷害。此效果一場戰鬥只能使用一次。', turn: { note: '額外移動至多7區域；進入有敵區域造成1D6傷害（另行擲骰）。一場戰鬥一次。' } },
+                    { name: '終末的龍捲', timing: '你的回合', cost: '–', desc: '你在本次戰鬥中合計移動超過7區域後可以使用，你可以將距離你兩區域內的所有隊友和敵人都任意移動至多兩區域。此效果一場戰鬥只能使用一次。', turn: { note: '兩區域內所有角色任意移動至多兩區域。一場戰鬥一次。' } }
+                ]
+            },
+            '亞巴頓': {
+                hit: 0, dodge: 1, support: 1, hp: 30,
+                talents: [
+                    { name: '蟲群偵探', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以控制昆蟲，讓牠們為你追蹤目標。使用此能力時，你選定一個人物，你派出某種昆蟲潛伏在該人物身上，這讓你在團務的期間可以隨時得知該人物的所在地。GM認為有必要時可以要求社交判定。' },
+                    { name: '致幻迷霧', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以釋放出能招致幻覺的物質，讓接觸到的人看到你希望他們看到的幻象。GM認為有必要時可以要求社交判定。' }
+                ],
+                builtins: [
+                    { name: '集群召喚', timing: '常駐', cost: '–', desc: '戰鬥開始時，你擁有三區域的「集群領域」，你可以將集群領域位置任意分配，但其中一個集群必須放在離你一格內，且所有集群需鄰接。\n你因為任何理由移動時，移動結束後你需重新分配集結領域。在集群領域中的敵人得到暈眩狀態，直到他們離開集群領域為止。且集群領域對敵人而言視為崎嶇地形。\n集群領域視為一種領域效果。', note: '集群中的敵人得到【暈眩】（攻擊集群中目標時記得計入其劣勢）。' }
+                ],
+                extras: [
+                    { name: '集群擴張', timing: '常駐', cost: '–', desc: '你擁有的集群領域改為五區域。' },
+                    { name: '劇毒集群', timing: '常駐', cost: '–', desc: '在集群中開始回合的敵人受到【毒 1D6】。', note: '集群中開始回合的敵人受到【毒 1D6】。' },
+                    { name: '侵蝕反射', timing: '見內文', cost: '1 行動力', desc: '每當你或集群中的隊友被攻擊且攻擊者命中時可以使用，你可以讓攻擊者自身受到該攻擊的一半傷害。' },
+                    { name: '鱗粉爆破', timing: '見內文', cost: '1 行動力', desc: '如果隊友攻擊位在你集群中的敵人且命中，所有集群中的敵人都受到同等該攻擊總傷害的一半傷害。' },
+                    { name: '閃燃光塵', timing: '見內文', cost: '1 行動力', desc: '如果隊友攻擊位在你集群中的敵人且命中，所有在你集群中的敵人受到盲目與燃燒 1D6狀態。' },
+                    { name: '集群遷躍', timing: '任意', cost: '1 行動力', desc: '你立刻移動到已有的另一個集群領域上，這次移動不會讓你重新分配集群領域。如果你在被攻擊時使用此效果，該攻擊對你的攻擊判定額外受到【劣勢 1】。' },
+                    { name: '光粉治癒', timing: '你的回合', cost: '–', desc: '所有隊友都至少進入過你的集群領域一次後可以使用，你可以讓集群中的所有隊友回復你擁有的【集群數量 D6】的耐久力，他們下一次攻擊有【優勢 2】。此效果每場戰鬥只能使用一次。', turn: { adv: 2, label: '受光粉治癒影響（優勢2）', note: '集群中隊友回復集群數量D6耐久。每場戰鬥一次。' } },
+                    { name: '潛能激發', timing: '你的回合', cost: '–', desc: '所有隊友都至少進入過你的集群領域一次後可以使用。選擇一個集群中的隊友，他在本來的行動以外立刻獲得一個額外回合，此回合和你有相同的先制值，並且行動順位緊接在你之後。此效果每場戰鬥只能使用一次。' }
+                ]
+            },
+            '耶夢加德': {
+                hit: 1, dodge: 0, support: 2, hp: 30,
+                talents: [
+                    { name: '領域感知', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以感覺到你半徑 50 公尺內所有生物的位置、當下的生命狀況正常、重傷、死亡和當下的強烈情緒，並可以知道該區域的地形和建築物構造，GM認為有必要時可以要求心智判定。' },
+                    { name: '騷靈現象', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以自由控制你所在的建築物中的可移動部件，例如將機械式的門鎖解除、把門打開、讓風扇開始旋轉、讓吊燈搖晃等。GM認為有必要時可以要求心智判定。' }
+                ],
+                builtins: [
+                    { name: '領域支配', timing: '常駐', cost: '–', desc: '你所在的區域與其鄰接區域是你的「領域」，你和領域內的隊友命中判定獲得 優勢 1。', turn: { adv: 1, label: '在領域內攻擊（優勢1）' } }
+                ],
+                extras: [
+                    { name: '領域擴張', timing: '常駐', cost: '–', desc: '你的領域範圍改為你所在的區域與距離兩格內的所有區域。' },
+                    { name: '領域吞噬', timing: '常駐', cost: '–', desc: '每當有任何敵人在你的領域中被打倒，你和所有在你領域中的隊友回復 2D6 耐久。', note: '領域中敵人被打倒時，領域中我方回復2D6耐久。' },
+                    { name: '世界蛇之鱗', timing: '任意', cost: '1 行動力', desc: '你和在你領域內的所有隊友獲得【格擋 5】。', turn: { note: '你與領域內隊友獲得【格擋 5】。' } },
+                    { name: '領域強化', timing: '你的回合', cost: '1 行動力', desc: '直到你下回合開始，你和所有在你領域內進行攻擊的隊友傷害 +1D6。', turn: { dmgDice: 1 } },
+                    { name: '銜尾之理', timing: '你的回合', cost: '1 行動力', desc: '指定你領域中的兩個隊友，他們下次回合開始時額外獲得一點行動力。' },
+                    { name: '被扼殺的世界', timing: '你的回合', cost: '1 行動力', desc: '消耗 1 行動力，直到你下回合開始為止，進入你的領域或是在你的領域中開始回合的敵人受到 2D6 傷害。', turn: { note: '進入或在領域中開始回合的敵人受到2D6傷害（另行擲骰）。' } },
+                    { name: '塵世統御者', timing: '你的回合', cost: '–', desc: '所有的隊友都至少在領域中攻擊一次後可以使用，領域中的所有隊友立刻進行一次攻擊，該次攻擊不能使用任何追加效果。此效果一場戰鬥中只能使用一次。' },
+                    { name: '黃昏的行軍', timing: '你的回合', cost: '–', desc: '所有的隊友都至少在領域中攻擊一次以後可以使用，領域中的所有隊友下一次回合開始時得到3 點額外行動力。此效果一場戰鬥只能使用一次。' }
+                ]
+            },
+            '芬里爾': {
+                hit: 1, dodge: 1, support: 0, hp: 25,
+                talents: [
+                    { name: '狩獵直覺', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以得知一個你曾見過的人或物現在所在地點的概略印象——例如該地的氣氛、氣味、景色片段等，GM認為必要時可以要求心智判定。' },
+                    { name: '破裂之顎', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以「咬碎」無生命物體，當你的手做出緊握的動作時，無形的狼牙會咬碎你面前半徑一公尺球體範圍內的任何非生物。GM認為必要時可以要求反應判定。' }
+                ],
+                builtins: [
+                    { name: '魔狼', timing: '常駐', cost: '–', desc: '你造成的傷害額外 +3。', passive: { dmgFlat: 3 } }
+                ],
+                extras: [
+                    { name: '魔狼之怒', timing: '常駐', cost: '–', desc: '你造成的傷害再額外 +2。', passive: { dmgFlat: 2 } },
+                    { name: '狩獵者的極致', timing: '常駐', cost: '–', desc: '當你觸發爆擊時，這次攻擊獲得 5D6 點終極傷害。', note: '爆擊時：+5D6 終極傷害。' },
+                    { name: '狩獵標記', timing: '你的回合', cost: '1 行動力', desc: '指定一個同區域的敵人，直到你的下回合開始，所有對該敵人的攻擊得到 4 點終極傷害。', turn: { note: '攻擊被標記目標：+4 終極傷害（終極傷害不計入傷害骰）。' } },
+                    { name: '必中之狼牙', timing: '命中判定後', cost: '1 行動力', desc: '你可以讓失敗的命中判定改為成功、或是讓強擊的命中判定改為爆擊。' },
+                    { name: '無休的追獵', timing: '見內文', cost: '1 行動力', desc: '和你同區域的敵人移動後，你可以立即移動到他移動的終點，此時的移動不消耗行動力。' },
+                    { name: '嶄新的狩獵', timing: '見內文', cost: '1 行動力', desc: '你的攻擊至少打倒一個敵人後可以使用，你可以再進行一次攻擊。此效果一回合只能使用一次。' },
+                    { name: '絕滅標記', timing: '你的回合', cost: '–', desc: '戰鬥中你自身打倒三個以上的敵人後，或戰場上只剩下一個敵人時可以使用，指定一個同區域的敵人，直到你的下回合開始，所有對該敵人的攻擊得到 10 點終極傷害。此效果一場戰鬥只能使用一次。', turn: { note: '攻擊被標記目標：+10 終極傷害。一場戰鬥一次。' } },
+                    { name: '終末捕食者', timing: '爆擊時', cost: '–', desc: '戰鬥中你自身打到三個以上的敵人後，或戰場上只剩下一個敵人時可以使用，當你觸發爆擊時，這次攻擊獲得 7D6 終極傷害。此額外終極傷害可以和狩獵者的極致給予的終極傷害疊加。此效果一場戰鬥中只能使用一次。', note: '爆擊時可用：+7D6 終極傷害（可與狩獵者的極致疊加）。' }
+                ]
+            },
+            '史爾特爾': {
+                hit: 1, dodge: 1, support: 1, hp: 40,
+                talents: [
+                    { name: '火焰控制', timing: '非戰鬥', cost: '1 關鍵字', desc: '你能憑空製造火焰，也能控制自然的火焰，讓它們更加激烈的燃燒、如你所願的蔓延或是熄滅。GM認為有必要的話可以要求反應判定。' },
+                    { name: '燄之形體', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以將火焰塑造成一手可以握持的簡單實體，例如武器或工具等等，這些實體有漆黑的外觀，隱隱透出熔岩般的光芒。你塑造出來的火焰實體只有你能夠使用，並且會在你放開它的時候消失。你不能塑造有複雜機械結構的實體。GM認為有必要的話可以要求反應或心智判定。' }
+                ],
+                builtins: [
+                    { name: '炎之軀', timing: '常駐', cost: '–', desc: '在你同區域或鄰接區域攻擊你的敵人，受到 1D6 傷害。範圍攻擊目標包括你也算是攻擊你。', note: '同／鄰接區域攻擊你的敵人受1D6傷害。' }
+                ],
+                extras: [
+                    { name: '熔岩流彈', timing: '常駐', cost: '–', desc: '你的炎之軀效果改為：不論距離，任何攻擊你、或是範圍攻擊目標包括你的敵人都受到 1D6 傷害。' },
+                    { name: '熾炎之軀', timing: '常駐', cost: '–', desc: '你的炎之軀所造成的傷害改為 2D6。' },
+                    { name: '生體自燃', timing: '常駐', cost: '–', desc: '當有敵人受到炎之軀效果傷害時，該敵人受到【燃燒1D6】狀態。' },
+                    { name: '炎之鎧', timing: '你的回合', cost: '1 行動力', desc: '直到你下回合開始，你受到的傷害減少 1D6，如果你持有熾炎之軀，則改為減少 2D6。', turn: { note: '受到的傷害減少1D6（持有熾炎之軀改為2D6）。' } },
+                    { name: '燃焰之國', timing: '你的回合', cost: '1 行動力', desc: '你和你同區域的隊友的攻擊額外帶有【燃燒 1D6】效果。', turn: { note: '本次攻擊附帶【燃燒 1D6】。' } },
+                    { name: '燃焰標靶', timing: '見內文', cost: '1 行動力', desc: '當敵人攻擊與你同區域或鄰接區域的隊友時，你可以攻擊目標改為你，該次攻擊將自動命中，你不能對範圍攻擊使用此效果。' },
+                    { name: '燃燒者的覺醒', timing: '你的回合', cost: '–', desc: '當你的耐久力在起始值的四分之一以下時可以使用，你的命中、迴避和支援 +3，你的所有攻擊都附帶給予【燃燒 2D6】效果，且你獲得兩點額外行動力。此效果持續到你的下回合開始，此效果一場戰鬥只能使用一次。', turn: { hit: 3, dodge: 3, support: 3, note: '攻擊附帶【燃燒 2D6】，獲得2點額外行動力。一場戰鬥一次。' } },
+                    { name: '炎之魔劍', timing: '你的回合', cost: '–', desc: '當你的耐久力在起始值的四分之一以下時可以使用。你或你同區域隊友下一次攻擊傷害獲得等同於你的最大耐久值－現在耐久值的額外終極傷害，此效果一場戰鬥只能使用一次。', turn: { note: '下一次攻擊+（最大耐久−現在耐久）終極傷害（用手動調整輸入）。一場戰鬥一次。' } }
+                ]
+            },
+            '阿薩托斯': {
+                hit: 0, dodge: 0, support: 0, hp: 30,
+                talents: [
+                    { name: '無形之手', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以「抓住」視線範圍內任何可以用手握持的物品，而不用真的接觸到它，就像有一隻無形的手在幫你行動一樣，GM認為有必要時可以要求反應判定。' },
+                    { name: '夢魘凝視', timing: '非戰鬥', cost: '1 關鍵字', desc: '你可以讓看見你雙眼的生物產生極大的恐懼，他們會不顧一切想要逃離。如果無法逃離，它們會恐懼顫抖，完全失去行為能力。GM認為必要時，可以要求社交判定。部分生物可能不受此效果影響，由GM判斷。' }
+                ],
+                builtins: [
+                    { name: '渾沌之影', timing: '常駐', cost: '–', desc: '每當你或離你 1 距離的隊友被攻擊且命中判定擲出後，你可以消耗一點行動力，讓該攻擊者重擲該次命中判定。' }
+                ],
+                extras: [
+                    { name: '渾沌迴避', timing: '常駐', cost: '–', desc: '當你使用渾沌之影時，攻擊者重丟的命中判定受到【劣勢 1】。' },
+                    { name: '盲目痴愚', timing: '見內文', cost: '–', desc: '和你在同一區域的敵人迴避 -2 並得到【混亂】狀態，直到他離開你所在區域為止。', note: '同區域敵人迴避−2並得到【混亂】。' },
+                    { name: '惡夢報復', timing: '你的回合', cost: '1 行動力', desc: '每當你或離你一區域的隊友被攻擊且攻擊者失手時可以使用，你可以讓攻擊者自身受到該攻擊的一半傷害。' },
+                    { name: '恐懼的庇護', timing: '攻擊命中時', cost: '1 行動力', desc: '選擇一個隊友，直到你的下回合開始，試圖攻擊該隊友的攻擊者將受到 2D6 傷害。', turn: { note: '攻擊受庇護隊友的敵人受2D6傷害。' } },
+                    { name: '因果侵蝕', timing: '攻擊命中時', cost: '1 行動力', desc: '選擇一個正面狀態，直到被你命中的目標下回合為止，它無法獲得該狀態，並解除已經擁有的該狀態。它的攻擊將無法因任何理由獲得優勢。', turn: { note: '命中後：目標禁用所選正面狀態且攻擊無法獲得優勢。' } },
+                    { name: '不確定的存在', timing: '你的回合', cost: '1 行動力', desc: '你和一個敵人立刻交換位置。' },
+                    { name: '渾沌之源核', timing: '攻擊命中時', cost: '–', desc: '當你在一場戰鬥中使用三次渾沌之影以後可以使用，被你命中的目標得到【毒 1D6】【燃燒 1D6】【吞食 1D6】【重創】【倒地】【遲滯】【暈眩】。', turn: { note: '命中後：目標得到毒、燃燒、吞食各1D6與重創、倒地、遲滯、暈眩。' } },
+                    { name: '惡夢的宮殿', timing: '你的回合', cost: '–', desc: '在一場戰鬥中使用三次渾沌之影以後可以使用，直到你的下回合開始，所有試圖攻擊你或你隊友的所有攻擊者將受到同等自身攻擊傷害值兩倍的傷害。' }
+                ]
+            }
+        };
+
+        // 泛用效果（本質）——所有本質皆可作為追加效果選擇
+        const ESSENCE_GENERIC = [
+            { name: '推移', timing: '常駐', cost: '–', desc: '當你移動時，你可以將你所經過區域的一個敵人沿著你移動的路徑推移 1 距離。' },
+            { name: '致命引力', timing: '你的回合', cost: '1 行動力', desc: '指定一個和你同區域的敵人，直到你下回合開始，該敵人只要可以就必須至少攻擊你一次。', turn: { note: '被指定的敵人必須至少攻擊你一次。' } },
+            { name: '追加耐久', timing: '常駐', cost: '–', desc: '你的耐久值追加 20 點。', passive: { hp: 20 } },
+            { name: '原初趨力', timing: '常駐', cost: '–', desc: '選擇一個你所持有且需要花費行動力的本質追加效果，每場戰鬥 2 次，你可以不花費行動力使用該效果。' },
+            { name: '本質調整', timing: '常駐', cost: '–', desc: '你的命中，迴避與支援修正任意兩個 +1。', special: 'assign2' },
+            { name: '堅韌防禦', timing: '常駐', cost: '–', desc: '你獲得【減傷 2】，這個減傷可以和其他效果提供的減傷累加。', note: '常駐【減傷 2】。' }
+        ];
+
+        // ============================================================
+        // 資料庫：型態
+        // ============================================================
+        const FORMS = {
+            '牙': {
+                hit: 1, dodge: 0, support: 1, range: '0～0', dice: 1, abilities: ['體能', '反應', '心智'],
+                builtins: [
+                    { name: '連牙', timing: '攻擊時', cost: '1 行動力', desc: '你本回合所有的命中 -3，但可以進行兩次攻擊，這兩次攻擊目標必須是同一個對象。', special: 'renga' }
+                ],
+                extras: [
+                    { name: '裂牙', timing: '使用連牙', cost: '–', desc: '每當你使用連牙時，且你這次連牙攻擊都結束後，被命中的目標得到易傷 3，此易傷可以疊加。', rengaNote: '連牙結束後：目標得到【易傷 3】（可疊加）。' },
+                    { name: '毒牙', timing: '使用連牙', cost: '–', desc: '每當你使用連牙時，且你這次連牙攻擊都結束後，被命中的目標得到毒 2D6，此毒效果可以疊加。', rengaNote: '連牙結束後：目標得到【毒 2D6】（可疊加）。' },
+                    { name: '三連牙', timing: '使用連牙', cost: '–', desc: '你使用連牙時可以選擇讓你本回合的所有命中-6，但可以進行三次攻擊，這三次攻擊對象必須是同一個目標。', special: 'tripleFang' },
+                    { name: '銳牙', timing: '常駐', cost: '–', desc: '你的連牙命中減值改為 -2。三連牙的命中減值改為 -4。', special: 'sharpFang' },
+                    { name: '多頭咬', timing: '使用連牙', cost: '–', desc: '你可以用連牙或三連牙給予的多次攻擊分別攻擊不同的目標。', rengaNote: '多次攻擊可分別攻擊不同目標。' },
+                    { name: '無盡咬', timing: '使用連牙', cost: '–', desc: '你使用連牙時，每一次命中的攻擊都會讓下一次獲得體能或反應點額外傷害，此額外傷害可以疊加。只要你持續攻擊且命中同一個目標，額外傷害就持續累積。', special: 'endlessBite' },
+                    { name: '鏡映多頭咬', timing: '使用連牙', cost: '–', desc: '你必須要擁有多頭咬才能選擇此效果。你使用連牙且每一擊的攻擊都是不同目標時，只要有其中一擊命中就視為三擊都命中、其中一擊強擊就視為三擊都強擊、爆擊也是比照辦理。', rengaNote: '分別攻擊不同目標時：一擊命中視為全部命中（強擊／爆擊比照）。' },
+                    { name: '永恆無盡咬', timing: '使用連牙', cost: '–', desc: '你必須要擁有無盡咬才能選擇此效果。如果你改變攻擊目標時原目標已經消滅，你的無盡咬效果給予你的累積傷害不會歸零。', rengaNote: '原目標消滅後換目標，無盡咬累積不歸零。' }
+                ]
+            },
+            '爪': {
+                hit: -1, dodge: -1, support: 1, range: '0～0', dice: 2, abilities: ['體能'],
+                builtins: [
+                    { name: '蓄力', timing: '攻擊前', cost: '1 行動力', desc: '你本次傷害增加體能點，此效果可以多次使用，增加的傷害值會累計。', special: 'charge' }
+                ],
+                extras: [
+                    { name: '高速蓄力', timing: '常駐', cost: '–', desc: '如果你在蓄力中只投入一點行動力，則你本次的傷害增加體能+3點且命中判定有優勢 1。', special: 'chargeFast' },
+                    { name: '預先填充', timing: '你的回合', cost: '–', desc: '你可以消耗至多三點行動力，當你下次使用蓄力時，視同你已經在蓄力中投入等量的行動力。' },
+                    { name: '體勢破壞', timing: '使用蓄力', cost: '–', desc: '當你使用蓄力且命中後，目標得到【倒地】狀態。', chargeNote: '蓄力命中後：目標得到【倒地】。' },
+                    { name: '蓄力延勢斬', timing: '使用蓄力', cost: '–', desc: '當你使用蓄力時，你的最大射程+1。', chargeNote: '蓄力時最大射程+1。' },
+                    { name: '蓄力爆破斬', timing: '使用蓄力', cost: '–', desc: '當你使用蓄力且命中時，你可以讓所有在你射程內的敵人受到總傷害值一半的傷害。', chargeNote: '蓄力命中後：射程內敵人受總傷害一半。' },
+                    { name: '三段蓄力斬', timing: '使用蓄力', cost: '–', desc: '如果你在蓄力中投入 3 點或以上的行動力，則你每投入一點行動力，傷害就再額外增加1D6點。', special: 'chargeTriple' },
+                    { name: '蓄力核爆斬', timing: '使用蓄力', cost: '–', desc: '你必須要擁有蓄力爆破斬才能選擇此效果。當你使用蓄力且命中時，你可以讓所有在你射程內的敵人受到等同總傷害值的傷害。', chargeNote: '蓄力命中後：射程內敵人受等同總傷害。' },
+                    { name: '真．三段蓄力斬', timing: '使用蓄力', cost: '–', desc: '你必須要擁有三段蓄力斬才能選擇此效果。如果你在蓄力中投入 3 點或以上的行動力，則被你命中的目標得到重創狀態，並且你可以解除一個目標身上的正面狀態。目標先被解除正面狀態，然後才結算你的傷害。攻擊後，你得到【破綻】狀態。', chargeNote: '蓄力3AP以上命中：目標得【重創】並解除其一個正面狀態；攻擊後你得到【破綻】。' }
+                ]
+            },
+            '角': {
+                hit: 0, dodge: -1, support: -1, range: '0～1', dice: 2, abilities: ['體能', '反應'],
+                builtins: [
+                    { name: '突擊', timing: '攻擊前', cost: '1 行動力', desc: '如果你本回合主動移動過，傷害就增加【體能或反應】點。', special: 'assault' }
+                ],
+                extras: [
+                    { name: '必中神槍', timing: '使用突擊', cost: '–', desc: '當你使用突擊時，你的命中獲得【優勢 1】，且如果失手可以重擲一次。', special: 'assaultSure' },
+                    { name: '絕對穿透', timing: '使用突擊', cost: '–', desc: '當你使用突擊時，無視你受到的任何劣勢效果，且你的攻擊無視【減傷】與【格擋】效果。', assaultNote: '突擊時無視劣勢，攻擊無視【減傷】【格擋】。' },
+                    { name: '動能突刺', timing: '使用突擊', cost: '–', desc: '當你使用突刺時，你可以將被你命中的目標推移至多 2 區域。', assaultNote: '命中後可推移目標至多2區域。' },
+                    { name: '雙角刺', timing: '使用突擊', cost: '–', desc: '當你使用突擊且命中時，如果目標的所在區域還有其他敵人，你可以讓至多一個其他敵人受到和這次攻擊等量的傷害。', assaultNote: '命中後：同區域至多一個其他敵人受等量傷害。' },
+                    { name: '零式突貫', timing: '使用突擊', cost: '–', desc: '你使用突擊時，可以將效果改為：攻擊前消耗一點行動力，如果你本回合沒有移動過，則傷害增加【體能或反應×3】點。', special: 'assaultZero' },
+                    { name: '飛翔突', timing: '使用突擊', cost: '–', desc: '你使用突擊時，如果你本回合主動移動至少兩個區域，則你的傷害再額外增加【體能或反應× 移動的區域數量】點，最大×5。', special: 'assaultFly' },
+                    { name: '零式突貫．改', timing: '使用突擊', cost: '–', desc: '你使用突擊時，如果你本回合還沒有移動過，你的最大射程+2 且你的傷害再增加【體能或反應× 你與敵人的距離】點。', special: 'assaultZeroKai' },
+                    { name: '飛翔突．改', timing: '使用突擊', cost: '–', desc: '你使用突擊時，你可以為每個你經過的區域各選擇一名敵人，你的攻擊改為同時攻擊這些敵人的範圍攻擊。', assaultNote: '攻擊改為對沿途各區域選定敵人的範圍攻擊。' }
+                ]
+            },
+            '鱗': {
+                hit: 0, dodge: -1, support: 1, range: '0～0', dice: 1, abilities: ['體能', '反應'],
+                builtins: [
+                    { name: '盾衛', timing: '見內文', cost: '1 行動力', desc: '你或與你距離一區域內的隊友將受到傷害時可以使用，該角色獲得格擋6。' }
+                ],
+                extras: [
+                    { name: '盾衛強化', timing: '常駐', cost: '–', desc: '你的【盾衛】效果給予的格擋值被改為格擋9。' },
+                    { name: '蓄能鱗', timing: '使用盾衛', cost: '–', desc: '每當你使用盾衛後，你的下一次攻擊傷害就增加【盾衛】效果給你的格擋值點。此效果只要你尚未攻擊就可以不斷累計。', turn: { input: { label: '累積格擋值', mult: 'flat' } } },
+                    { name: '反衝鱗', timing: '使用盾衛', cost: '–', desc: '你使用盾衛時，可以任意將攻擊者移動至多 2 區域。' },
+                    { name: '不屈', timing: '使用盾衛', cost: '–', desc: '你使用盾衛時，如果該次攻擊會讓盾衛保護對象的耐久值歸 0，則讓他的耐久時變成 1。' },
+                    { name: '延伸盾衛', timing: '使用盾衛', cost: '–', desc: '你使用盾衛時，如果該次傷害同時影響複數隊友，則所有在你的盾衛有效距離內受到傷害的隊友都獲得【盾衛】效果。' },
+                    { name: '集中盾衛', timing: '使用盾衛', cost: '–', desc: '你使用盾衛時可以額外消耗行動力，每多消耗一點，就讓該次盾衛效果給予的格擋值增加一倍。' },
+                    { name: '反衝定身', timing: '使用盾衛', cost: '–', desc: '你必須要擁有反衝鱗才能選擇此效果，每當你使用盾衛後，你可以給予攻擊者【倒地】和【破綻】狀態。' },
+                    { name: '浮游鱗', timing: '使用盾衛', cost: '–', desc: '你必須擁有延伸盾衛才能選擇此效果，你的盾衛有效距離改成：你或與你距離2區域內的隊友。' }
+                ]
+            },
+            '腕': {
+                hit: 0, dodge: 1, support: 1, range: '0～0', dice: 2, abilities: ['體能', '反應'],
+                builtins: [
+                    { name: '藉機攻擊', timing: '見內文', cost: '1 行動力', desc: '每當有敵人在你所在的區域因為任何理由移動，或是攻擊你以外的目標時可以使用，你可以立刻對他進行一次攻擊。' }
+                ],
+                extras: [
+                    { name: '巨腕', timing: '常駐', cost: '–', desc: '你的藉機攻擊改為「每當有敵人在離你一格內的區域因為任何理由移動，或是攻擊你以外的目標可以使用，你可以立刻對他進行一次攻擊，該次攻擊射程+1」。' },
+                    { name: '雙腕', timing: '常駐', cost: '–', desc: '你的基礎傷害改為【1D6+體能】但每當你進行你回合中的攻擊動作時，你可以消耗一點行動力多進行一次攻擊最多多一次。你的第二次攻擊有【劣勢1】且命中 -2。', special: 'doubleArm' },
+                    { name: '炸彈拋摔', timing: '攻擊時', cost: '–', desc: '當你攻擊且命中時，你可以將該敵人任意移動一區域，該敵人得到倒地狀態。', turn: { note: '命中後：移動目標一區域並使其【倒地】。' } },
+                    { name: '徒手撕裂', timing: '攻擊時', cost: '–', desc: '當你攻擊且命中時，直到你下回合開始，該敵人得到【易傷4】與【重創】。', turn: { note: '命中後：目標得到【易傷 4】與【重創】。' } },
+                    { name: '腦幹重擊', timing: '攻擊時', cost: '–', desc: '當你攻擊且命中時，該敵人得到混亂或眩暈狀態，由你選擇。', turn: { note: '命中後：目標得到【混亂】或【暈眩】（擇一）。' } },
+                    { name: '圍毆', timing: '使用藉機攻擊', cost: '–', desc: '你的藉機攻擊命中時，你或敵人所在的區域如有任何隊友，本次傷害+2D6。', turn: { dmgDice: 2, label: '藉機攻擊且區域內有隊友' } },
+                    { name: '殘肢武裝', timing: '攻擊時', cost: '–', desc: '你必須要擁有徒手撕裂才能選擇此效果。當你攻擊且命中時，選擇一個目標擁有的攻擊部位或武裝，直到你下回合開始為止你的傷害獲得等同於該部位或武裝的基本傷害的加值。', turn: { note: '命中後：傷害獲得目標部位基本傷害的加值（用手動調整輸入）。' } },
+                    { name: '隊友投擲', timing: '使用藉機攻擊', cost: '–', desc: '你必須要擁有圍毆才能選擇此效果。你的藉機攻擊額外得到下列效果：每當有友方在你所在區域因為任何理由移動時可以使用，該友方額外獲得1區域的免費移動，且他下一次攻擊傷害+【2D6+你的體能】。' }
+                ]
+            },
+            '吐息': {
+                hit: 0, dodge: -1, support: -1, range: '1～3', dice: 2, abilities: ['反應', '心智'],
+                builtins: [
+                    { name: '爆發吐息', timing: '攻擊前', cost: '1 行動力', desc: '你的攻擊目標改為射程內一區域的所有敵人。', turn: { note: '攻擊目標改為射程內一區域的所有敵人。' } }
+                ],
+                extras: [
+                    { name: '零距吐息', timing: '常駐', cost: '–', desc: '你的射程改為0～2，攻擊和你同區域的敵人時傷害 +1D6。', passive: { rangeSet: '0～2' }, turn: { dmgDice: 1, label: '攻擊同區域敵人' } },
+                    { name: '長程吐息', timing: '常駐', cost: '–', desc: '你的最大射程 +2。', passive: { rangeMax: 2 } },
+                    { name: '反動後躍', timing: '攻擊後', cost: '–', desc: '你攻擊後可以免費移動一區域。' },
+                    { name: '掃蕩吐息', timing: '使用爆發吐息', cost: '–', desc: '你使用爆發吐息時可以將目標改為射程內三區域的所有敵人，該三區域需鄰接。' },
+                    { name: '集束吐息', timing: '使用爆發吐息', cost: '–', desc: '如果你指定的目標區域中總共只有一個敵人，則你的爆發吐息傷害 +2D6。', turn: { dmgDice: 2, label: '爆發吐息且目標區域僅一敵' } },
+                    { name: '動量爆破', timing: '使用爆發吐息', cost: '–', desc: '你使用爆發吐息並命中時，你可以將被你命中的所有目標任意移動一區域。' },
+                    { name: '極遠狙擊', timing: '常駐', cost: '–', desc: '你必須擁有長程吐息才能選擇此效果。當你攻擊距離你4區域或以上的敵人時，你獲得優勢 1，傷害額外追加你的【反應或心智】，且你的攻擊無視減傷與格檔效果。', turn: { adv: 1, abilityAdd: ['反應', '心智'], label: '攻擊4區域以上目標', note: '攻擊無視【減傷】【格擋】。' } },
+                    { name: '槍型武藝', timing: '常駐', cost: '–', desc: '你必須擁有零距吐息才能選擇此效果。攻擊和你同區域的敵人時的的傷害額外追加【體能+反應】。', special: 'gunArts' }
+                ]
+            },
+            '觸手': {
+                hit: 0, dodge: 1, support: 2, range: '0～2', dice: 1, abilities: ['社交', '心智'],
+                builtins: [
+                    { name: '束縛', timing: '攻擊前', cost: '1 行動力', desc: '如果你的攻擊命中，直到你的下回合開始目標受到【遲滯】效果（需額外消耗一點行動力才能進行移動）且你的隊友對他命中判定有【優勢 1】。', turn: { note: '命中後：目標【遲滯】，隊友對其命中【優勢 1】。' } },
+                    { name: '隔空援護', timing: '常駐', cost: '–', desc: '你的支援距離改為 2 區域。' }
+                ],
+                extras: [
+                    { name: '無限延伸', timing: '常駐', cost: '–', desc: '你的射程改為0~4、支援距離改為 4 區域。', passive: { rangeSet: '0～4' } },
+                    { name: '支援之手', timing: '常駐', cost: '–', desc: '每回合一次，你可以不消耗行動力進行支援。' },
+                    { name: '束縛捕食', timing: '使用束縛', cost: '–', desc: '每當你使用束縛且命中時，直到下回合開始，目標受到【吞食 1D6】的效果。', turn: { note: '束縛命中後：目標受【吞食 1D6】。', label: '束縛捕食' } },
+                    { name: '報復連結', timing: '使用束縛', cost: '–', desc: '當你使用束縛且命中時，直到下回合開始，每當你受到傷害時，被你束縛的目標受到同等你所承受的傷害。', turn: { note: '束縛命中後：你受傷時目標受等量傷害。', label: '報復連結' } },
+                    { name: '束縛爆破', timing: '使用束縛', cost: '–', desc: '當你使用束縛且命中後，直到你的下回合開始，當你的隊友攻擊被你束縛的目標且命中時，你可以選擇立刻中止對目標的束縛（這會同時解除束縛能力所給予的所有效果），對目標造成 3D6 額外傷害。' },
+                    { name: '多體束縛', timing: '攻擊前', cost: '–', desc: '從射程內選擇三個目標，你的攻擊改為對這些目標的範圍攻擊，但你的基本傷害會改為 0。', special: 'multiBind' },
+                    { name: '支援攻擊', timing: '見內文', cost: '–', desc: '你必須要擁有支援之手才能選擇此效果，每戰鬥輪一次，當你進行對隊友的命中或傷害支援時，你可以對該隊友攻擊的目標之一進行一次額外攻擊。' },
+                    { name: '補噬吸收', timing: '使用束縛', cost: '–', desc: '你需要擁有束縛捕食才能選擇此效果，當你使用束縛且命中時，你獲得一點行動力，且目標下回合開始獲得的行動力減少一點。', turn: { note: '束縛命中後：你+1行動力，目標下回合−1行動力。', label: '補噬吸收' } }
+                ]
+            },
+            '幼子': {
+                hit: 0, dodge: 0, support: 1, range: '0～0', dice: 1, abilities: ['社交', '心智'],
+                builtins: [
+                    { name: '幼子創生', timing: '你的回合', cost: '1 行動力', desc: '在你所在區域設置一隻「幼子」。幼子是基本能力值和戰鬥能力值都與你相同的友方角色。\n幼子擁有15點耐久力，每回合可以攻擊一次和移動一區域，你可以花費你的行動力讓牠進行額外移動。\n幼子被創生出來的該輪就可以行動，先制值和你相同，行動順位緊接在你之後。幼子的耐久力歸零即消滅，需重新創生。最多只能擁有1個幼子。\n你自身無法攻擊。\n\n＊幼子和自身共用所有常駐效果。\n＊每當你使用非常駐的效果時，需選擇要作用在自身或幼子身上。如果效果有次數限制，你和幼子共用此限制。\n＊如果你擁有任何領域類的效果，一律改為以幼子所在區域作為領域效果的起點。如果你擁有多個幼子，每回合開始你需選擇一個作為效果起點。', note: '你自身無法攻擊，計算結果為幼子的攻擊（能力值與你相同）。' }
+                ],
+                extras: [
+                    { name: '堅韌幼子', timing: '常駐', cost: '–', desc: '你創生出來的幼子擁有10點額外耐久值。' },
+                    { name: '多重創生', timing: '常駐', cost: '–', desc: '創生效果的「最多只能擁有1個幼子」改為最多可以擁有2個幼子。但你的基本傷害改為社交或心智，且幼子的起始耐久力改為10。' },
+                    { name: '武裝基因', timing: '常駐', cost: '–', desc: '創生時選擇一個非幼子的天啟武裝型態，你創生出來的幼子將擁有你所選型態的射程和內建效果，但基本傷害值不變。' },
+                    { name: '進化', timing: '常駐', cost: '–', desc: '每當你或你的隊友攻擊觸發強擊時，選擇一個你擁有的幼子，牠得到5點耐久力並且攻擊獲得1D6額外傷害。此效果可以多次獲得，持續到戰鬥結束或是該幼子消滅為止。一場戰鬥最多可以進化3次。', turn: { input: { label: '進化次數（上限3）', mult: 'dice' } } },
+                    { name: '共感治療', timing: '任意', cost: '–', desc: '你可以扣減你任意數量的耐久力，讓你的一個幼子恢復等量的耐久，或是反過來。此效果一戰鬥輪只能使用一次。' },
+                    { name: '幼子爆彈', timing: '任意', cost: '–', desc: '你可以讓一個存在中且至少還有1點耐久力的幼子立刻消滅，並對和該幼子同區域的任一敵人造成2D6傷害。', turn: { note: '消滅一隻幼子，對其同區域一敵造成2D6傷害（另行擲骰）。' } },
+                    { name: '狼群戰術', timing: '常駐', cost: '–', desc: '你必須要擁有多重創生才能選擇此效果。如果你擁有的兩個幼子在同一戰鬥輪內攻擊同一個目標，則第二個攻擊的幼子命中判定得到【優勢1】。如果這兩個幼子的攻擊都命中，則第二個攻擊的幼子傷害+2D6。', turn: { adv: 1, dmgDice: 2, label: '第二隻幼子攻擊同一目標（傷害+2D6需兩隻都命中）' } },
+                    { name: '極巨進化', timing: '常駐', cost: '–', desc: '你必須要擁有進化才能選擇此效果。每當幼子進化時，除了本來的進化效果，還可以額外選擇下列效果之一，不可選擇重複的效果：\n・防禦強化：幼子每回合開始時得到格擋5。\n・狀態攻擊：幼子的攻擊額外造成【毒1D6】或【燃燒1D6】或【吞食1D6】，此效果可以重複選擇，每次需選擇不同的狀態。\n・坐騎化：幼子移動時，可以讓一個同區域的隊友一起移動。\n・再生能力：幼子得到再生2D6。\n如果你已經達到進化次數上限，則每次觸發進化時可以更換一個已選擇的極巨進化效果。' }
+                ]
+            }
+        };
+
+        // 泛用效果（型態）
+        const FORM_GENERIC = [
+            { name: '傷害強化', timing: '常駐', cost: '–', desc: '你的基本傷害 +1D6。', passive: { dmgDice: 1 } },
+            { name: '射程強化', timing: '常駐', cost: '–', desc: '你的最大射程 +1。', passive: { rangeMax: 1 } },
+            { name: '武裝調整', timing: '常駐', cost: '–', desc: '你的命中，迴避與支援修正任選兩個 +1。', special: 'assign2' },
+            { name: '額外行動', timing: '常駐', cost: '–', desc: '每場戰鬥你有兩點額外行動力，這些額外行動力只能用來啟動型態的效果。' },
+            { name: '狀態特攻', timing: '常駐', cost: '–', desc: '選擇此效果時從【倒地】、【盲目】、【毒】、【燃燒】等狀態中選擇一個。每當你攻擊身上有該狀態的敵人時，你的傷害 +2D6。', turn: { dmgDice: 2, label: '目標帶有所選狀態' } },
+            { name: '雜魚殺手', timing: '常駐', cost: '–', desc: '當你攻擊從獸且命中結算傷害後，如果他的耐久值在 5 或以下，直接消滅該從獸。', note: '結算後從獸耐久≤5直接消滅。' }
+        ];
+
+        // ============================================================
+        // 資料庫：狀態（含解除條件）
+        //   selfAttack: 自身持有時對自身攻擊的影響
+        // ============================================================
+        const STATUSES = [
+            { name: '易傷', type: 'negative', hasValue: true, desc: '當你受到傷害時，傷害增加n點。不同來源的【易傷】效果可以累計。', release: '和【減傷】抵銷。' },
+            { name: '重創', type: 'negative', desc: '你接受回復效果時無法回復耐久值。', release: '接受過一次治療效果後解除。' },
+            { name: '倒地', type: 'negative', desc: '你無法主動移動，受到攻擊時攻擊者對你有【優勢1】。', release: '在你的回合可以花費 1 行動力解除。' },
+            { name: '遲滯', type: 'negative', desc: '下次主動移動時，每移動一區域需消耗額外一點行動力。', release: '下次主動移動結束後解除。' },
+            { name: '破綻', type: 'negative', desc: '你下次受到攻擊時必定被命中，且該次傷害無視你的【減傷】與【格擋】。', release: '受到一次攻擊後解除。' },
+            { name: '暈眩', type: 'negative', desc: '你的命中判定受到【劣勢1】。', release: '下次回合結束時解除。', selfAttack: { dis: 1 } },
+            { name: '盲目', type: 'negative', desc: '你只能攻擊距離1區域以內的敵人，或是使用範圍攻擊。你的命中判定有劣勢1。', release: '下次回合結束時解除。', selfAttack: { dis: 1, note: '只能攻擊距離1區域內的敵人或使用範圍攻擊。' } },
+            { name: '混亂', type: 'negative', desc: '你的攻擊目標只能隨機選擇。如果有多種可用的攻擊手段，只能隨機使用其中一種。', release: '下次回合結束時解除。', selfAttack: { note: '攻擊目標與攻擊手段只能隨機選擇。' } },
+            { name: '毒', type: 'negative', hasValue: true, isDice: true, desc: '你的回合開始時受到nD6傷害。不同來源的【毒】可以累計。', release: '傷害值的D6有出現任何1則解除。' },
+            { name: '燃燒', type: 'negative', hasValue: true, isDice: true, desc: '你的回合開始時受到nD6傷害。不同來源的【燃燒】可以累計。', release: '傷害值的D6有出現任何1則解除。' },
+            { name: '吞食', type: 'negative', hasValue: true, isDice: true, desc: '得到此狀態時，給予你狀態的角色立即將你移動到他所在區域。你的回合開始時受到nD6傷害。你無法主動或被動移動。你只能攻擊給予你吞食狀態者。此狀態對擁有【Boss特性】的目標無效。', release: '在你的回合可以花費 1 行動力解除。', selfAttack: { note: '只能攻擊給予你吞食狀態者。' } },
+            { name: '無敵', type: 'positive', desc: '當你受到實際傷害時，將該傷害取消。此效果對終極傷害無效。', release: '取消過一次傷害後解除。' },
+            { name: '減傷', type: 'positive', hasValue: true, desc: '當你受到傷害時，傷害減少n點。不同來源的【減傷】效果可以累計。', release: '和【易傷】抵銷。' },
+            { name: '格擋', type: 'positive', hasValue: true, desc: '當你受到傷害時，傷害減少n點。不同來源的【格擋】效果可以累計。', release: '格擋過任意傷害後解除。' },
+            { name: '飛行', type: 'positive', desc: '你不受地形效果影響，你攻擊非飛行目標時有【優勢1】。', release: '受到傷害後解除。', special: 'flight' },
+            { name: '再生', type: 'positive', hasValue: true, isDice: true, desc: '每回合開始時，你回復nD6耐久值。不同來源的【再生】效果可以累計。', release: '只能被特殊效果解除。' }
+        ];
+
+        // ============================================================
+        // 資料庫：紋章
+        // ============================================================
+        const EMBLEMS = [
+            { num: '11', name: '強擊', timing: '攻擊命中後', desc: '使用後你下一次攻擊傷害 +2D6。', turn: { dmgDice: 2 } },
+            { num: '12', name: '迅擊', timing: '任意', desc: '使用後你可以立即進行一次攻擊。' },
+            { num: '13', name: '衝擊', timing: '攻擊命中後', desc: '使用後如果你的攻擊命中，則將目標任意移動至多三區域。', turn: { note: '命中後將目標任意移動至多三區域。' } },
+            { num: '14', name: '延勢', timing: '命中判定前', desc: '使用後你的武器射程 +2。', turn: { rangeMax: 2 } },
+            { num: '15', name: '瞬步', timing: '移動時', desc: '使用後你可以立即移動至多兩區域，如果你以此法移動過，則你下一次攻擊對移動終點區域的敵人傷害 +1D6。', turn: { dmgDice: 1, label: '攻擊移動終點區域的敵人' } },
+            { num: '16', name: '反擊', timing: '受到攻擊時', desc: '使用後你立刻對你的敵人進行一次攻擊。' },
+            { num: '22', name: '復仇', timing: '攻擊命中後', desc: '只能在攻擊上回合攻擊過你的敵人時使用，使用後你本次的攻擊傷害 +3D6。', turn: { dmgDice: 3 } },
+            { num: '23', name: '掃蕩', timing: '命中判定前', desc: '使用後你的攻擊目標改為射程內一區域全體。', turn: { note: '攻擊目標改為射程內一區域全體。' } },
+            { num: '24', name: '繫命', timing: '攻擊命中後', desc: '使用後直到你下回合開始，每當你的攻擊命中時，你回復等同傷害值的耐久力。', turn: { note: '攻擊命中時回復等同傷害值的耐久力。' } },
+            { num: '25', name: '狂暴', timing: '你的回合', desc: '使用後直到你下回合開始，你的所有傷害 +2D6，但所有對你的攻擊皆自動命中。', turn: { dmgDice: 2, note: '所有對你的攻擊皆自動命中。' } },
+            { num: '26', name: '必中', timing: '命中判定前', desc: '使用後你的下一次攻擊不須擲骰直接視為命中。', turn: { note: '下一次攻擊不須擲骰直接命中。' } },
+            { num: '33', name: '挑釁', timing: '你的回合', desc: '使用後直到你下回合開始，和你距離一區域以內的敵人不能攻擊你以外的對象。' },
+            { num: '34', name: '不動', timing: '特殊', desc: '和你同區域的敵人想要移動時使用，使用後該敵人立即停止移動並受到 2D6 終極傷害。' },
+            { num: '35', name: '司令', timing: '你的回合', desc: '使用後直到你下回合開始，和你同區域的隊友獲得優勢 1，並獲得 1D6 額外傷害。', turn: { note: '同區域隊友獲得優勢1與1D6額外傷害（不影響自身）。' } },
+            { num: '36', name: '天翔', timing: '你的回合', desc: '使用後直到你下回合開始，你成為飛行狀態，此飛行狀態不會因為你被攻擊命中而解除。', turn: { note: '獲得不因被命中而解除的【飛行】（記得勾選狀態）。' } },
+            { num: '44', name: '隱身', timing: '你的回合', desc: '使用後直到你下回合開始，你不能被指定為攻擊目標，你的命中有優勢 2。', turn: { adv: 2 } },
+            { num: '45', name: '警戒', timing: '任意', desc: '使用後所有對你的攻擊有劣勢 1，直到你下次受到攻擊命中。' },
+            { num: '46', name: '幻步', timing: '任意', desc: '使用後和你一個隊友交換位置。' },
+            { num: '55', name: '反射', timing: '受到傷害時', desc: '使用後對你造成的傷害目標受到等量的傷害。' },
+            { num: '56', name: '無雙', timing: '你的回合', desc: '使用後直到你下回合開始，你受到的所有傷害減半。' },
+            { num: '66', name: '進階', timing: '特殊', desc: '你改擲「進階紋章表」。' },
+            { num: '★2', name: '攻擊極化', timing: '你的回合', desc: '你下一次攻擊傷害值加倍。', turn: { note: '本次攻擊總傷害加倍（擲骰後將結果×2）。' } },
+            { num: '★3', name: '絕對防禦', timing: '你受傷害時', desc: '你得到無敵狀態。' },
+            { num: '★4', name: '永恆之槍', timing: '命中判定前', desc: '取代你本回合的攻擊，你選擇任一個區域，對該區域所有敵人造成 4D6 點傷害。那些敵人直到你下回合開始為止無法移動。', turn: { note: '取代攻擊：對一區域所有敵人造成4D6傷害（另行擲骰）並使其無法移動。' } },
+            { num: '★5', name: '寒霜擊', timing: '命中判定前', desc: '你下一次的攻擊傷害 +2D6，如果你的攻擊命中，則目標受到遲滯狀態。', turn: { dmgDice: 2, note: '命中後目標【遲滯】。' } },
+            { num: '★6', name: '熾火擊', timing: '命中判定前', desc: '你下一次的攻擊傷害 +2D6，如果你的攻擊命中，則目標受到燃燒 1D6。', turn: { dmgDice: 2, note: '命中後目標【燃燒 1D6】。' } },
+            { num: '★7', name: '爆雷擊', timing: '命中判定前', desc: '你下一次的攻擊傷害 +2D6，如果你的攻擊命中，則直到你的下回合開始為止，目標受到暈眩狀態。', turn: { dmgDice: 2, note: '命中後目標【暈眩】。' } },
+            { num: '★8', name: '狂風擊', timing: '命中判定前', desc: '你下一次的攻擊傷害 +2D6，如果你的攻擊命中，將目標任意移動至多兩區域。', turn: { dmgDice: 2, note: '命中後移動目標至多兩區域。' } },
+            { num: '★9', name: '愚者號令', timing: '你的回合', desc: '選擇至多三個目標，將他們任意移動兩個區域。' },
+            { num: '★10', name: '時流導航', timing: '你的回合', desc: '指定一個與你同區域的敵人為目標，你和你的所有隊友可以立即對該敵人進行一次攻擊，該攻擊不可以使用需消耗行動力的效果。' },
+            { num: '★11', name: '覺醒', timing: '任意', desc: '選擇一個已經結束回合的隊友，他視為還沒有行動過，並在當前行動順位結束後立刻開始他的回合。' },
+            { num: '★12', name: '因果固定', timing: '任何判定後', desc: '你可以將該判定改為大成功或大失敗。' }
+        ];
+
+        // ============================================================
+        // 資料庫：戰鬥特技
+        // ============================================================
+        const FEATS = [
+            { name: '重傷攻擊', desc: '每當你命中判定觸發強擊時，對目標造成5點終極傷害，就算此次攻擊沒有命中此效果也會生效。' },
+            { name: '致殘攻擊', desc: '每當你的命中判定觸發強擊時，指定被你攻擊的目標身上的一個非常駐的部位，直到你下回合開始，每次目標使用該部位將受到10點終極傷害，如果該部位是攻擊部位，他的命中判定有劣勢1。' },
+            { name: '重整體勢', desc: '每當你的命中判定觸發強擊時，你回復5點耐久值。' },
+            { name: '誘導行動', desc: '每當你的命中判定觸發強擊時，你將該敵人任意移動1區域。' }
+        ];
+
+        // ============================================================
+        // 狀態管理與設定檔
+        // ============================================================
+        function esc(s) {
+            return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        }
+
+        function defaultState() {
+            return {
+                name: '',
+                abilities: { '體能': 1, '反應': 1, '心智': 1, '社交': 1 },
+                hitAbility: '反應', dodgeAbility: '體能', dmgAbility: '',
+                fate: 5, ap: 3,
+                essence: '', talent: '', form: '',
+                essenceExtras: [], formExtras: [],
+                assigns: {}, buffAbility: '體能',
+                statuses: {}, statusValues: {},
+                turnOn: {}, turnInputs: {}, turnChoices: {},
+                emblems: [], emblemOn: {}, feat: '',
+                flightTargetNonFly: true,
+                rengaMode: '', chargeAP: 0,
+                assaultMode: '', assaultAbility: '體能', assaultRegions: 2, assaultDistance: 1,
+                biteStacks: 0, biteAbility: '體能',
+                manual: { hit: 0, adv: 0, dis: 0, dice: 0, flat: 0, dodge: 0 }
+            };
+        }
+
+        const STORE_KEY = 'knightCalcProfiles';
+        let store = { activeId: null, profiles: {} };
+        let S = defaultState();
+        let saveTimer = null;
+
+        function loadStore() {
+            try {
+                const raw = localStorage.getItem(STORE_KEY);
+                if (raw) store = JSON.parse(raw);
+            } catch (e) {}
+            if (!store.profiles || Object.keys(store.profiles).length === 0) {
+                const id = 'p' + Date.now();
+                store = { activeId: id, profiles: { [id]: defaultState() } };
+            }
+            if (!store.profiles[store.activeId]) store.activeId = Object.keys(store.profiles)[0];
+            S = Object.assign(defaultState(), store.profiles[store.activeId]);
+            S.manual = Object.assign(defaultState().manual, S.manual);
+        }
+
+        function saveNow() {
+            clearTimeout(saveTimer); saveTimer = null;
+            store.profiles[store.activeId] = S;
+            try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) {}
+        }
+        function save() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 300); }
+        window.addEventListener('beforeunload', saveNow);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+
+        function switchProfile(id) {
+            saveNow();
+            store.activeId = id;
+            S = Object.assign(defaultState(), store.profiles[id]);
+            S.manual = Object.assign(defaultState().manual, S.manual);
+            renderAll();
+        }
+        function newProfile() {
+            saveNow();
+            const id = 'p' + Date.now();
+            store.profiles[id] = defaultState();
+            store.activeId = id;
+            S = store.profiles[id];
+            saveNow(); renderAll();
+        }
+        function duplicateProfile() {
+            saveNow();
+            const id = 'p' + Date.now();
+            store.profiles[id] = JSON.parse(JSON.stringify(S));
+            store.profiles[id].name = S.name + '（副本）';
+            store.activeId = id;
+            S = store.profiles[id];
+            saveNow(); renderAll();
+        }
+        function deleteProfile() {
+            if (Object.keys(store.profiles).length <= 1) { alert('至少需保留一個設定檔。'); return; }
+            if (!confirm('確定要刪除設定檔「' + S.name + '」嗎？')) return;
+            delete store.profiles[store.activeId];
+            store.activeId = Object.keys(store.profiles)[0];
+            S = Object.assign(defaultState(), store.profiles[store.activeId]);
+            saveNow(); renderAll();
+        }
+        function exportProfiles() {
+            const blob = new Blob([JSON.stringify(store, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '騎士計算機設定_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        function importProfiles() {
+            const input = document.createElement('input');
+            input.type = 'file'; input.accept = '.json';
+            input.onchange = e => {
+                const f = e.target.files[0];
+                if (!f) return;
+                const r = new FileReader();
+                r.onload = ev => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (!data.profiles) throw 0;
+                        if (confirm('確定要匯入嗎？這將覆蓋現有的所有設定檔。')) {
+                            store = data; loadStoreFix(); saveNow(); renderAll();
+                        }
+                    } catch (_) { alert('匯入失敗：檔案格式錯誤'); }
+                };
+                r.readAsText(f);
+            };
+            input.click();
+        }
+        function loadStoreFix() {
+            if (!store.profiles[store.activeId]) store.activeId = Object.keys(store.profiles)[0];
+            S = Object.assign(defaultState(), store.profiles[store.activeId]);
+            S.manual = Object.assign(defaultState().manual, S.manual);
+        }
+
+        // ============================================================
+        // 取得目前持有的效果
+        // ============================================================
+        function essenceData() { return ESSENCES[S.essence] || null; }
+        function formData() { return FORMS[S.form] || null; }
+
+        function ownedEssenceEffects() {
+            const e = essenceData();
+            if (!e) return [];
+            const owned = [...e.builtins];
+            e.extras.forEach(x => { if (S.essenceExtras.includes(x.name)) owned.push(x); });
+            ESSENCE_GENERIC.forEach(x => { if (S.essenceExtras.includes(x.name)) owned.push(x); });
+            return owned;
+        }
+        function ownedFormEffects() {
+            const f = formData();
+            if (!f) return [];
+            const owned = [...f.builtins];
+            f.extras.forEach(x => { if (S.formExtras.includes(x.name)) owned.push(x); });
+            FORM_GENERIC.forEach(x => { if (S.formExtras.includes(x.name)) owned.push(x); });
+            return owned;
+        }
+        function allOwned() { return [...ownedEssenceEffects(), ...ownedFormEffects()]; }
+        function owns(name) { return allOwned().some(x => x.name === name); }
+
+        // ============================================================
+        // 核心計算
+        // ============================================================
+        function effAbility(name) {
+            if (!name) return 0;
+            let v = S.abilities[name] || 0;
+            // 能力強化／強化專精（貝西摩斯）
+            if (owns('能力強化') && S.buffAbility === name) {
+                v += owns('強化專精') ? 3 : 2;
+            }
+            // 能力爆發（回合，+3 任一能力）
+            if (S.turnOn['能力爆發'] && S.turnChoices['能力爆發'] === name) v += 3;
+            // 獸王加冕（回合，全能力+4）
+            if (S.turnOn['獸王加冕']) v += 4;
+            return v;
+        }
+
+        function assignBonus(key) { // key: 'hit'|'dodge'|'support'
+            let n = 0;
+            for (const eff of ['本質調整', '武裝調整']) {
+                if (owns(eff) && Array.isArray(S.assigns[eff]) && S.assigns[eff].includes(key)) n += 1;
+            }
+            return n;
+        }
+
+        function rengaPenalty() {
+            if (S.form !== '牙' || !S.rengaMode) return 0;
+            const sharp = S.formExtras.includes('銳牙');
+            if (S.rengaMode === '三連牙') return sharp ? -4 : -6;
+            return sharp ? -2 : -3;
+        }
+
+        function calc() {
+            const bd = { hit: [], dmg: [], adv: [], notes: [] };
+            const e = essenceData(), f = formData();
+            if (!e || !f) return null;
+
+            // ---------- 命中 ----------
+            let hit = 0;
+            const ha = effAbility(S.hitAbility);
+            hit += ha; bd.hit.push([S.hitAbility, ha]);
+            if (e.hit) { hit += e.hit; bd.hit.push(['本質（' + S.essence + '）', e.hit]); }
+            if (f.hit) { hit += f.hit; bd.hit.push(['型態（' + S.form + '）', f.hit]); }
+            const ab = assignBonus('hit');
+            if (ab) { hit += ab; bd.hit.push(['調整效果', ab]); }
+
+            let adv = 0, dis = 0;
+
+            // 連牙／三連牙
+            const rp = rengaPenalty();
+            if (rp) {
+                hit += rp;
+                bd.hit.push([S.rengaMode + (S.formExtras.includes('銳牙') ? '（銳牙）' : ''), rp]);
+                bd.notes.push([S.rengaMode, S.rengaMode === '三連牙' ? '對同一目標攻擊三次。' : '對同一目標攻擊兩次。']);
+                ownedFormEffects().forEach(x => { if (x.rengaNote) bd.notes.push([x.name, x.rengaNote]); });
+            }
+
+            // 突擊系
+            let assaultDmg = 0;
+            if (S.form === '角' && S.assaultMode) {
+                const av = effAbility(S.assaultAbility);
+                if (S.assaultMode === '突擊') assaultDmg = av;
+                else if (S.assaultMode === '零式突貫') assaultDmg = av * 3;
+                else if (S.assaultMode === '飛翔突') assaultDmg = av * Math.min(Math.max(S.assaultRegions, 2), 5);
+                else if (S.assaultMode === '零式突貫．改') assaultDmg = av * Math.max(S.assaultDistance, 0);
+                if (S.formExtras.includes('必中神槍')) { adv += 1; bd.adv.push(['必中神槍', 1]); bd.notes.push(['必中神槍', '失手可重擲一次。']); }
+                ownedFormEffects().forEach(x => { if (x.assaultNote) bd.notes.push([x.name, x.assaultNote]); });
+            }
+
+            // 蓄力系
+            let chargeDmg = 0, chargeDice = 0;
+            if (S.form === '爪' && S.chargeAP > 0) {
+                const n = S.chargeAP;
+                const body = effAbility('體能');
+                if (n === 1 && S.formExtras.includes('高速蓄力')) {
+                    chargeDmg = body + 3;
+                    adv += 1; bd.adv.push(['高速蓄力', 1]);
+                } else {
+                    chargeDmg = n * body;
+                }
+                if (n >= 3 && S.formExtras.includes('三段蓄力斬')) chargeDice = n;
+                ownedFormEffects().forEach(x => { if (x.chargeNote) bd.notes.push([x.name, x.chargeNote]); });
+            }
+
+            // 通用回合效果（turn 定義）
+            let dmgDice = 0, dmgFlat = 0, hitTurn = 0, dodgeTurn = 0, supportTurn = 0, rangeMaxTurn = 0;
+            const turnSources = [];
+            allOwned().forEach(x => {
+                if (!x.turn) return;
+                if (!S.turnOn[x.name]) return;
+                const t = x.turn;
+                if (t.hit) { hitTurn += t.hit; bd.hit.push([x.name, t.hit]); }
+                if (t.dodge) dodgeTurn += t.dodge;
+                if (t.support) supportTurn += t.support;
+                if (t.adv) { adv += t.adv; bd.adv.push([x.name, t.adv]); }
+                if (t.dis) { dis += t.dis; bd.adv.push([x.name, -t.dis]); }
+                if (t.dmgDice) { dmgDice += t.dmgDice; bd.dmg.push([x.name, t.dmgDice + 'D6']); }
+                if (t.rangeMax) rangeMaxTurn += t.rangeMax;
+                if (t.abilityAdd) {
+                    const ch = S.turnChoices[x.name] || t.abilityAdd[0];
+                    const v = effAbility(ch);
+                    dmgFlat += v; bd.dmg.push([x.name + '（' + ch + '）', v]);
+                }
+                if (t.input) {
+                    const n = Math.max(0, S.turnInputs[x.name] || 0);
+                    if (n > 0) {
+                        if (t.input.mult === 'adv') { adv += n; bd.adv.push([x.name, n]); }
+                        else if (t.input.mult === 'dice') { dmgDice += n; bd.dmg.push([x.name, n + 'D6']); }
+                        else { const per = t.input.per || 1; dmgFlat += n * per; bd.dmg.push([x.name, n * per]); }
+                    }
+                }
+                if (t.note) bd.notes.push([x.name, t.note]);
+                if (t.abilityBuff) bd.notes.push([x.name, '所選能力+' + t.abilityBuff + '（已計入能力值）。']);
+                if (t.allAbilityBuff) bd.notes.push([x.name, '全能力+' + t.allAbilityBuff + '（已計入能力值）。']);
+                turnSources.push(x.name);
+            });
+
+            // 紋章
+            EMBLEMS.forEach(em => {
+                if (!S.emblemOn[em.name]) return;
+                const t = em.turn || {};
+                if (t.adv) { adv += t.adv; bd.adv.push(['紋章・' + em.name, t.adv]); }
+                if (t.dmgDice) { dmgDice += t.dmgDice; bd.dmg.push(['紋章・' + em.name, t.dmgDice + 'D6']); }
+                if (t.rangeMax) rangeMaxTurn += t.rangeMax;
+                if (t.note) bd.notes.push(['紋章・' + em.name, t.note]);
+                if (!em.turn) bd.notes.push(['紋章・' + em.name, em.desc]);
+            });
+
+            // 狀態影響
+            STATUSES.forEach(st => {
+                if (!S.statuses[st.name]) return;
+                if (st.selfAttack) {
+                    if (st.selfAttack.dis) { dis += st.selfAttack.dis; bd.adv.push(['狀態・' + st.name, -st.selfAttack.dis]); }
+                    if (st.selfAttack.note) bd.notes.push(['狀態・' + st.name, st.selfAttack.note]);
+                }
+                if (st.special === 'flight') {
+                    if (S.flightTargetNonFly) { adv += 1; bd.adv.push(['飛行（目標非飛行）', 1]); }
+                    allOwned().forEach(x => { if (x.flightNote && S.essenceExtras.includes(x.name)) bd.notes.push([x.name, x.flightNote]); });
+                }
+            });
+
+            hit += hitTurn;
+
+            // 無盡咬
+            if (S.form === '牙' && S.formExtras.includes('無盡咬') && S.biteStacks > 0) {
+                const v = effAbility(S.biteAbility) * S.biteStacks;
+                dmgFlat += v;
+                bd.dmg.push(['無盡咬 ×' + S.biteStacks + '（' + S.biteAbility + '）', v]);
+            }
+
+            // 手動調整
+            if (S.manual.hit) { hit += Number(S.manual.hit); bd.hit.push(['手動', Number(S.manual.hit)]); }
+            if (S.manual.adv) { adv += Number(S.manual.adv); bd.adv.push(['手動優勢', Number(S.manual.adv)]); }
+            if (S.manual.dis) { dis += Number(S.manual.dis); bd.adv.push(['手動劣勢', -Number(S.manual.dis)]); }
+
+            // ---------- 傷害 ----------
+            let baseDice = f.dice;
+            let dmgAbilityVal = effAbility(S.dmgAbility);
+            let baseLabel = '型態基礎';
+            if (owns('雙腕')) { baseDice = 1; dmgAbilityVal = effAbility('體能'); baseLabel = '雙腕基礎'; bd.notes.push(['雙腕', '可消耗1行動力多攻擊一次（第二擊劣勢1、命中−2）。']); }
+            let zeroBase = false;
+            if (S.form === '觸手' && S.turnOn['多體束縛']) { zeroBase = true; bd.notes.push(['多體束縛', '對三個目標範圍攻擊，基本傷害改為0。']); }
+
+            let totalDice = 0, totalFlat = 0;
+            if (!zeroBase) {
+                totalDice += baseDice; bd.dmg.unshift([baseLabel, baseDice + 'D6']);
+                totalFlat += dmgAbilityVal;
+                bd.dmg.splice(1, 0, [S.dmgAbility || '能力', dmgAbilityVal]);
+            } else {
+                bd.dmg.unshift(['多體束縛', '基本傷害0']);
+            }
+
+            // 常駐 passive
+            allOwned().forEach(x => {
+                if (!x.passive) return;
+                if (x.passive.dmgDice) { totalDice += x.passive.dmgDice; bd.dmg.push([x.name, x.passive.dmgDice + 'D6']); }
+                if (x.passive.dmgFlat) { totalFlat += x.passive.dmgFlat; bd.dmg.push([x.name, x.passive.dmgFlat]); }
+            });
+
+            // 槍型武藝
+            if (S.form === '吐息' && S.turnOn['槍型武藝'] && S.formExtras.includes('槍型武藝')) {
+                const v = effAbility('體能') + effAbility('反應');
+                totalFlat += v; bd.dmg.push(['槍型武藝（體能+反應）', v]);
+            }
+
+            totalDice += dmgDice + chargeDice;
+            if (chargeDice) bd.dmg.push(['三段蓄力斬 ×' + S.chargeAP, chargeDice + 'D6']);
+            totalFlat += dmgFlat;
+            if (chargeDmg) { totalFlat += chargeDmg; bd.dmg.push(['蓄力 ×' + S.chargeAP + (S.chargeAP === 1 && S.formExtras.includes('高速蓄力') ? '（高速）' : ''), chargeDmg]); }
+            if (assaultDmg) { totalFlat += assaultDmg; bd.dmg.push([S.assaultMode + '（' + S.assaultAbility + '）', assaultDmg]); }
+            if (S.manual.dice) { totalDice += Number(S.manual.dice); bd.dmg.push(['手動', Number(S.manual.dice) + 'D6']); }
+            if (S.manual.flat) { totalFlat += Number(S.manual.flat); bd.dmg.push(['手動', Number(S.manual.flat)]); }
+
+            // ---------- 其他數值 ----------
+            let dodge = effAbility(S.dodgeAbility) + 7 + e.dodge + f.dodge + assignBonus('dodge') + dodgeTurn + Number(S.manual.dodge || 0);
+            let support = effAbility('社交') + e.support + f.support + assignBonus('support') + supportTurn;
+            let init = Math.floor((effAbility('反應') + effAbility('心智')) / 2);
+            let hp = e.hp;
+            allOwned().forEach(x => { if (x.passive && x.passive.hp) hp += x.passive.hp; });
+
+            // 射程
+            let rangeStr = f.range;
+            allOwned().forEach(x => { if (x.passive && x.passive.rangeSet) rangeStr = x.passive.rangeSet; });
+            let [rMin, rMax] = rangeStr.split('～').map(Number);
+            allOwned().forEach(x => { if (x.passive && x.passive.rangeMax) rMax += x.passive.rangeMax; });
+            rMax += rangeMaxTurn;
+            if (S.form === '爪' && S.chargeAP > 0 && S.formExtras.includes('蓄力延勢斬')) rMax += 1;
+            if (S.form === '角' && S.assaultMode === '零式突貫．改') rMax += 2;
+
+            // 持有型提醒
+            allOwned().forEach(x => { if (x.note) bd.notes.push([x.name, x.note]); });
+            if (S.feat) {
+                const ft = FEATS.find(z => z.name === S.feat);
+                if (ft) bd.notes.push(['戰鬥特技・' + ft.name, ft.desc]);
+            }
+            // 狀態解除提醒（負面且勾選中）
+            STATUSES.forEach(st => {
+                if (S.statuses[st.name] && !st.selfAttack && st.type === 'negative') {
+                    bd.notes.push(['狀態・' + st.name, '解除條件：' + st.release]);
+                }
+            });
+
+            const net = adv - dis;
+            const hitDice = net > 0 ? (2 + net) + 'B6' : net < 0 ? (2 - net) + 'W6' : '2D6';
+            const hitStr = hitDice + (hit >= 0 ? '+' + hit : String(hit));
+            const dmgStr = totalDice > 0
+                ? totalDice + 'D6' + (totalFlat > 0 ? '+' + totalFlat : totalFlat < 0 ? String(totalFlat) : '')
+                : String(totalFlat);
+
+            return { hit, adv, dis, net, hitStr, dmgStr, totalDice, totalFlat, dodge, support, init, hp, rMin, rMax, bd };
+        }
+
+        // ============================================================
+        // 渲染
+        // ============================================================
+        function fmtMod(n) { return n >= 0 ? '+' + n : String(n); }
+
+        function renderProfileBar() {
+            const sel = document.getElementById('profileSelect');
+            sel.innerHTML = '';
+            Object.entries(store.profiles).forEach(([id, p]) => {
+                const o = document.createElement('option');
+                o.value = id; o.textContent = p.name || '（未命名）';
+                if (id === store.activeId) o.selected = true;
+                sel.appendChild(o);
+            });
+            document.getElementById('charName').value = S.name;
+        }
+
+        function renderAbilities() {
+            const g = document.getElementById('abilityGrid');
+            g.innerHTML = ABILITIES.map(a => `
+                <div class="ability-cell">
+                    <label>${a}</label>
+                    <input type="number" value="${S.abilities[a]}" min="0" onchange="setAbility('${a}', this.value)">
+                </div>
+            `).join('');
+            fillSelect('hitAbilitySel', ['體能', '反應', '心智'], S.hitAbility);
+            fillSelect('dodgeAbilitySel', ['體能', '反應', '心智'], S.dodgeAbility);
+            document.getElementById('fateInput').value = S.fate;
+            document.getElementById('apInput').value = S.ap;
+        }
+
+        function fillSelect(id, options, current, emptyLabel) {
+            const sel = document.getElementById(id);
+            sel.innerHTML = options.map(o => `<option value="${esc(o)}" ${o === current ? 'selected' : ''}>${o === '' ? esc(emptyLabel || '－') : esc(o)}</option>`).join('');
+        }
+
+        function effectRow(x, opts) {
+            const checked = opts.checked ? 'checked' : '';
+            const cls = opts.builtin ? 'effect-item builtin' : 'effect-item';
+            const ctrl = opts.builtin
+                ? ''
+                : `<input type="checkbox" ${checked} onchange="${opts.handler}('${esc(x.name)}', this.checked)">`;
+            let extra = '';
+            if (x.special === 'assign2' && opts.checked !== false && (opts.builtin || opts.checked)) {
+                extra = assignControls(x.name);
+            }
+            if (x.special === 'buffAbility' || (x.special === 'buffUpgrade' && opts.checked)) {
+                if (x.special === 'buffAbility') extra = buffControls();
+            }
+            return `
+                <div class="${cls}">
+                    ${ctrl}
+                    <div class="effect-main">
+                        <span class="effect-name">${esc(x.name)}</span>
+                        <span class="effect-meta">${esc(x.timing)}｜${esc(x.cost)}</span>
+                        <div class="effect-desc">${esc(x.desc)}</div>
+                        ${extra}
+                    </div>
+                </div>`;
+        }
+
+        function assignControls(effName) {
+            const cur = S.assigns[effName] || [];
+            return `<div style="margin-top:4px;font-size:12px">分配＋1（限兩項）：` +
+                ['hit', 'dodge', 'support'].map(k => {
+                    const label = { hit: '命中', dodge: '迴避', support: '支援' }[k];
+                    return `<label style="margin-right:10px"><input type="checkbox" ${cur.includes(k) ? 'checked' : ''}
+                        onchange="toggleAssign('${esc(effName)}', '${k}', this.checked)"> ${label}</label>`;
+                }).join('') + `</div>`;
+        }
+
+        function buffControls() {
+            return `<div style="margin-top:4px;font-size:12px">強化的能力值：<select onchange="setKey('buffAbility', this.value); refresh()">` +
+                ABILITIES.map(a => `<option ${S.buffAbility === a ? 'selected' : ''}>${a}</option>`).join('') + `</select></div>`;
+        }
+
+        function renderEssence() {
+            const e = essenceData();
+            if (!e) {
+                fillSelect('essenceSel', ['', ...Object.keys(ESSENCES)], '', '（選擇本質）');
+                document.getElementById('essenceStatsLabel').textContent = '';
+                document.getElementById('essenceContent').innerHTML = '<div class="panel-body hint">請先選擇本質。</div>';
+                return;
+            }
+            fillSelect('essenceSel', ['', ...Object.keys(ESSENCES)], S.essence, '（選擇本質）');
+            document.getElementById('essenceStatsLabel').textContent =
+                `命中${fmtMod(e.hit)}　迴避${fmtMod(e.dodge)}　支援${fmtMod(e.support)}　耐久${e.hp}`;
+            let html = '';
+            html += `<details open><summary>本質天賦（擇一）</summary><div class="details-body">`;
+            html += e.talents.map(t => `
+                <div class="effect-item">
+                    <input type="radio" name="talent" ${S.talent === t.name ? 'checked' : ''} onchange="setKey('talent', '${esc(t.name)}'); refresh()">
+                    <div class="effect-main">
+                        <span class="effect-name">${esc(t.name)}</span>
+                        <span class="effect-meta">${esc(t.timing)}｜${esc(t.cost)}</span>
+                        <div class="effect-desc">${esc(t.desc)}</div>
+                    </div>
+                </div>`).join('');
+            html += `</div></details>`;
+            html += `<details open><summary>內建效果（自動獲得）</summary><div class="details-body">`;
+            html += e.builtins.map(x => effectRow(x, { builtin: true })).join('');
+            html += `</div></details>`;
+            html += `<details open><summary>追加效果</summary><div class="details-body">`;
+            html += e.extras.map(x => effectRow(x, { checked: S.essenceExtras.includes(x.name), handler: 'toggleEssenceExtra' })).join('');
+            html += `<div style="border-top:1px solid var(--border-light);margin:8px 0 4px;padding-top:6px;font-size:11px;color:var(--text-muted)">泛用效果</div>`;
+            html += ESSENCE_GENERIC.map(x => effectRow(x, { checked: S.essenceExtras.includes(x.name), handler: 'toggleEssenceExtra' })).join('');
+            html += `</div></details>`;
+            document.getElementById('essenceContent').innerHTML = html;
+        }
+
+        function renderForm() {
+            const f = formData();
+            if (!f) {
+                fillSelect('formSel', ['', ...Object.keys(FORMS)], '', '（選擇型態）');
+                fillSelect('dmgAbilitySel', [''], '');
+                document.getElementById('formStatsLabel').textContent = '';
+                document.getElementById('formContent').innerHTML = '<div class="panel-body hint">請先選擇型態。</div>';
+                return;
+            }
+            fillSelect('formSel', ['', ...Object.keys(FORMS)], S.form, '（選擇型態）');
+            fillSelect('dmgAbilitySel', f ? f.abilities : [''], S.dmgAbility);
+            document.getElementById('formStatsLabel').textContent =
+                `命中${fmtMod(f.hit)}　迴避${fmtMod(f.dodge)}　支援${fmtMod(f.support)}　射程${f.range}　傷害${f.dice}D6+能力`;
+            let html = '';
+            html += `<details open><summary>內建效果（自動獲得）</summary><div class="details-body">`;
+            html += f.builtins.map(x => effectRow(x, { builtin: true })).join('');
+            html += `</div></details>`;
+            html += `<details open><summary>追加效果</summary><div class="details-body">`;
+            html += f.extras.map(x => effectRow(x, { checked: S.formExtras.includes(x.name), handler: 'toggleFormExtra' })).join('');
+            html += `<div style="border-top:1px solid var(--border-light);margin:8px 0 4px;padding-top:6px;font-size:11px;color:var(--text-muted)">泛用效果</div>`;
+            html += FORM_GENERIC.map(x => effectRow(x, { checked: S.formExtras.includes(x.name), handler: 'toggleFormExtra' })).join('');
+            html += `</div></details>`;
+            document.getElementById('formContent').innerHTML = html;
+        }
+
+        function renderFate() {
+            const used = S.essenceExtras.length + S.formExtras.length;
+            let el = document.getElementById('fateStatus');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'fateStatus'; el.className = 'fate-status';
+                const panel = document.querySelector('.col-build .panel');
+                panel.appendChild(el);
+            }
+            el.textContent = `追加效果已選 ${used}／命運點 ${S.fate}`;
+            el.classList.toggle('over', used > S.fate);
+        }
+
+        function renderFeat() {
+            const sel = document.getElementById('featSel');
+            sel.innerHTML = `<option value="">（無）</option>` + FEATS.map(x =>
+                `<option value="${esc(x.name)}" ${S.feat === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+            const ft = FEATS.find(x => x.name === S.feat);
+            document.getElementById('featDesc').textContent = ft ? ft.desc : '';
+        }
+
+        // ----- 戰鬥面板 -----
+        function renderTurnEffects() {
+            let html = '';
+
+            // 牙：連牙模式
+            if (S.form === '牙') {
+                const sharp = S.formExtras.includes('銳牙');
+                html += `<div class="turn-row"><b>連牙</b>
+                    <label><input type="radio" name="renga" ${!S.rengaMode ? 'checked' : ''} onchange="setKey('rengaMode',''); refresh()"> 不使用</label>
+                    <label><input type="radio" name="renga" ${S.rengaMode === '連牙' ? 'checked' : ''} onchange="setKey('rengaMode','連牙'); refresh()"> 連牙（命中${sharp ? '−2' : '−3'}・2次攻擊）</label>
+                    ${S.formExtras.includes('三連牙') ? `<label><input type="radio" name="renga" ${S.rengaMode === '三連牙' ? 'checked' : ''} onchange="setKey('rengaMode','三連牙'); refresh()"> 三連牙（命中${sharp ? '−4' : '−6'}・3次攻擊）</label>` : ''}
+                </div>`;
+                if (S.formExtras.includes('無盡咬')) {
+                    html += `<div class="turn-row"><b>無盡咬累積</b>
+                        <input type="number" min="0" value="${S.biteStacks}" onchange="setNum('biteStacks', this.value); refresh()"> 次 ×
+                        <select onchange="setKey('biteAbility', this.value); refresh()">
+                            ${['體能', '反應'].map(a => `<option ${S.biteAbility === a ? 'selected' : ''}>${a}</option>`).join('')}
+                        </select></div>`;
+                }
+            }
+
+            // 爪：蓄力
+            if (S.form === '爪') {
+                html += `<div class="turn-row"><b>蓄力</b> 投入行動力
+                    <input type="number" min="0" value="${S.chargeAP}" onchange="setNum('chargeAP', this.value); refresh()">
+                    <span class="t-meta">每點+體能${S.formExtras.includes('高速蓄力') ? '；僅1點時+體能+3且優勢1' : ''}${S.formExtras.includes('三段蓄力斬') ? '；3點以上每點再+1D6' : ''}</span>
+                </div>`;
+            }
+
+            // 角：突擊
+            if (S.form === '角') {
+                const modes = ['突擊'];
+                if (S.formExtras.includes('零式突貫')) modes.push('零式突貫');
+                if (S.formExtras.includes('飛翔突')) modes.push('飛翔突');
+                if (S.formExtras.includes('零式突貫．改')) modes.push('零式突貫．改');
+                html += `<div class="turn-row"><b>突擊</b>
+                    <label><input type="radio" name="assault" ${!S.assaultMode ? 'checked' : ''} onchange="setKey('assaultMode',''); refresh()"> 不使用</label>
+                    ${modes.map(m => `<label><input type="radio" name="assault" ${S.assaultMode === m ? 'checked' : ''} onchange="setKey('assaultMode','${m}'); refresh()"> ${m}</label>`).join('')}
+                    <select onchange="setKey('assaultAbility', this.value); refresh()">
+                        ${['體能', '反應'].map(a => `<option ${S.assaultAbility === a ? 'selected' : ''}>${a}</option>`).join('')}
+                    </select>`;
+                if (S.assaultMode === '飛翔突') html += ` 移動區域數 <input type="number" min="2" max="5" value="${S.assaultRegions}" onchange="setNum('assaultRegions', this.value); refresh()">`;
+                if (S.assaultMode === '零式突貫．改') html += ` 與敵距離 <input type="number" min="0" value="${S.assaultDistance}" onchange="setNum('assaultDistance', this.value); refresh()">`;
+                html += `</div>`;
+            }
+
+            // 通用 turn 效果
+            allOwned().forEach(x => {
+                if (!x.turn) return;
+                const t = x.turn;
+                const on = !!S.turnOn[x.name];
+                let row = `<div class="turn-row">
+                    <label><input type="checkbox" ${on ? 'checked' : ''} onchange="toggleTurn('${esc(x.name)}', this.checked)"> <b>${esc(x.name)}</b></label>
+                    <span class="t-meta">${esc(x.timing)}｜${esc(x.cost)}</span>`;
+                const effects = [];
+                if (t.hit) effects.push('命中' + fmtMod(t.hit));
+                if (t.adv) effects.push('優勢' + t.adv);
+                if (t.dis) effects.push('劣勢' + t.dis);
+                if (t.dmgDice) effects.push('傷害+' + t.dmgDice + 'D6');
+                if (t.rangeMax) effects.push('射程+' + t.rangeMax);
+                if (t.abilityBuff) effects.push('能力+' + t.abilityBuff);
+                if (t.allAbilityBuff) effects.push('全能力+' + t.allAbilityBuff);
+                if (effects.length) row += `<span class="t-effect">${effects.join('　')}</span>`;
+                if (t.label) row += `<span class="t-meta">（${esc(t.label)}）</span>`;
+                if (on && t.abilityBuff) {
+                    row += ` <select onchange="setTurnChoice('${esc(x.name)}', this.value)">` +
+                        ABILITIES.map(a => `<option ${(S.turnChoices[x.name] || '體能') === a ? 'selected' : ''}>${a}</option>`).join('') + `</select>`;
+                }
+                if (on && t.abilityAdd) {
+                    row += ` <select onchange="setTurnChoice('${esc(x.name)}', this.value)">` +
+                        t.abilityAdd.map(a => `<option ${(S.turnChoices[x.name] || t.abilityAdd[0]) === a ? 'selected' : ''}>${a}</option>`).join('') + `</select>`;
+                }
+                if (on && t.input) {
+                    row += ` ${esc(t.input.label)} <input type="number" min="0" value="${S.turnInputs[x.name] || 0}"
+                        onchange="setTurnInput('${esc(x.name)}', this.value)">`;
+                }
+                row += `</div>`;
+                html += row;
+            });
+
+            if (!html) html = '<div class="hint">' + (S.essence && S.form ? '目前的構成沒有可在回合中使用的效果。' : '請先選擇本質與型態。') + '</div>';
+            document.getElementById('turnEffects').innerHTML = html;
+        }
+
+        function renderStatuses() {
+            const g = document.getElementById('statusGrid');
+            g.innerHTML = STATUSES.map(st => {
+                const on = !!S.statuses[st.name];
+                let row = `<div class="status-item">
+                    <input type="checkbox" ${on ? 'checked' : ''} onchange="toggleStatus('${esc(st.name)}', this.checked)">
+                    <span class="s-name ${st.type}">${esc(st.name)}${st.hasValue ? (st.isDice ? ' nD6' : ' n') : ''}</span>`;
+                if (st.hasValue && on) {
+                    row += `<input type="number" min="1" value="${S.statusValues[st.name] || 1}" onchange="setStatusValue('${esc(st.name)}', this.value)">${st.isDice ? 'D6' : ''}`;
+                }
+                if (st.special === 'flight' && on) {
+                    row += `<label style="font-size:11px"><input type="checkbox" ${S.flightTargetNonFly ? 'checked' : ''} onchange="setBool('flightTargetNonFly', this.checked)"> 目標非飛行</label>`;
+                }
+                row += `<span class="status-tooltip">${esc(st.desc)}\n解除條件：${esc(st.release)}</span></div>`;
+                return row;
+            }).join('');
+        }
+
+        function renderEmblems() {
+            const owned = EMBLEMS.filter(em => S.emblems.includes(em.name));
+            document.getElementById('emblemList').innerHTML = owned.length
+                ? owned.map(em => `
+                    <div class="turn-row">
+                        <label><input type="checkbox" ${S.emblemOn[em.name] ? 'checked' : ''} onchange="toggleEmblem('${esc(em.name)}', this.checked)">
+                        <b>${esc(em.num)}　${esc(em.name)}</b></label>
+                        <span class="t-meta">${esc(em.timing)}</span>
+                        <span class="effect-desc" style="flex-basis:100%;margin-left:24px">${esc(em.desc)}</span>
+                    </div>`).join('')
+                : '<div class="hint">尚未持有紋章，請在左側「紋章（持有）」面板勾選。</div>';
+        }
+
+        function renderOwnedSummary() {
+            const el = document.getElementById('ownedSummary');
+            const e = essenceData(), f = formData();
+            if (!e || !f) { el.innerHTML = '<div class="hint">請先選擇本質與型態。</div>'; return; }
+
+            const sections = [];
+            function group(title, items) {
+                if (!items.length) return;
+                sections.push(`<div style="border-top:1px solid var(--border-light);margin:8px 0 4px;padding-top:6px;font-size:11px;color:var(--text-muted)">${esc(title)}</div>` +
+                    items.map(x => `
+                        <div class="effect-item">
+                            <div class="effect-main">
+                                <span class="effect-name">${esc(x.name)}</span>
+                                <span class="effect-meta">${esc(x.timing || '')}${x.cost ? '｜' + esc(x.cost) : ''}</span>
+                                <div class="effect-desc">${esc(x.desc)}</div>
+                            </div>
+                        </div>`).join(''));
+            }
+
+            const talent = e.talents.find(t => t.name === S.talent);
+            group('本質天賦', talent ? [talent] : []);
+            group('本質內建效果', e.builtins);
+            group('本質追加效果', [...e.extras, ...ESSENCE_GENERIC].filter(x => S.essenceExtras.includes(x.name)));
+            group('型態內建效果', f.builtins);
+            group('型態追加效果', [...f.extras, ...FORM_GENERIC].filter(x => S.formExtras.includes(x.name)));
+            group('紋章', EMBLEMS.filter(em => S.emblems.includes(em.name)).map(em => ({ name: em.num + '　' + em.name, timing: em.timing, cost: '', desc: em.desc })));
+            const ft = FEATS.find(x => x.name === S.feat);
+            group('戰鬥特技', ft ? [{ name: ft.name, timing: '', cost: '', desc: ft.desc }] : []);
+
+            el.innerHTML = sections.length ? sections.join('') : '<div class="hint">尚未持有任何效果。</div>';
+        }
+
+        function renderEmblemOwn() {
+            document.getElementById('emblemOwnList').innerHTML = EMBLEMS.map(em => `
+                <div class="effect-item">
+                    <input type="checkbox" ${S.emblems.includes(em.name) ? 'checked' : ''} onchange="toggleEmblemOwn('${esc(em.name)}', this.checked)">
+                    <div class="effect-main">
+                        <span class="effect-name">${esc(em.num)}　${esc(em.name)}</span>
+                        <span class="effect-meta">${esc(em.timing)}</span>
+                        <div class="effect-desc">${esc(em.desc)}</div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function renderManual() {
+            const fields = [['hit', '命中±'], ['adv', '優勢+'], ['dis', '劣勢+'], ['dice', '傷害D6±'], ['flat', '傷害固定±'], ['dodge', '迴避±']];
+            document.getElementById('manualGrid').innerHTML = fields.map(([k, label]) => `
+                <div class="manual-cell"><label>${label}</label>
+                <input type="number" value="${S.manual[k] || 0}" onchange="setManual('${k}', this.value)"></div>`).join('');
+        }
+
+        function renderOutput() {
+            const r = calc();
+            if (!r) {
+                document.getElementById('hitOutput').textContent = '——';
+                document.getElementById('dmgOutput').textContent = '——';
+                document.getElementById('hitSub').textContent = '';
+                document.getElementById('dmgSub').textContent = '';
+                document.getElementById('statCells').innerHTML = '';
+                document.getElementById('breakdown').innerHTML = '<div>請先選擇本質與型態。</div>';
+                document.getElementById('notesList').style.display = 'none';
+                return;
+            }
+            document.getElementById('hitOutput').textContent = r.hitStr;
+            document.getElementById('dmgOutput').textContent = r.dmgStr;
+            document.getElementById('hitSub').textContent =
+                r.net > 0 ? `優勢${r.net}：擲${2 + r.net}顆取高2顆` :
+                r.net < 0 ? `劣勢${-r.net}：擲${2 - r.net}顆取低2顆` : '無優劣勢';
+            document.getElementById('dmgSub').textContent = r.totalDice + '顆D6＋固定值' + r.totalFlat;
+
+            document.getElementById('statCells').innerHTML = [
+                ['迴避', r.dodge], ['支援', fmtMod(r.support)], ['先制', r.init],
+                ['耐久', r.hp], ['射程', r.rMin + '～' + r.rMax], ['行動力', S.ap]
+            ].map(([k, v]) => `<div class="stat-cell"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+
+            const hitParts = r.bd.hit.map(([l, v]) => `${esc(l)}<b class="${v >= 0 ? 'pos' : 'neg'}">${fmtMod(v)}</b>`).join('　');
+            const advParts = r.bd.adv.length ? '　｜　' + r.bd.adv.map(([l, v]) => `${esc(l)}<b class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '優勢+' + v : '劣勢' + v}</b>`).join('　') : '';
+            const dmgParts = r.bd.dmg.map(([l, v]) => `${esc(l)}<b>${typeof v === 'number' ? fmtMod(v) : '+' + v}</b>`).join('　');
+            document.getElementById('breakdown').innerHTML =
+                `<div>命中明細：${hitParts}${advParts}</div><div>傷害明細：${dmgParts}</div>`;
+
+            const notesEl = document.getElementById('notesList');
+            if (r.bd.notes.length) {
+                notesEl.style.display = 'block';
+                notesEl.innerHTML = r.bd.notes.map(([src, txt]) =>
+                    `<li><span class="note-src">${esc(src)}：</span>${esc(txt)}</li>`).join('');
+            } else {
+                notesEl.style.display = 'none';
+            }
+        }
+
+        function renderAll() {
+            renderProfileBar();
+            renderAbilities();
+            renderEssence();
+            renderForm();
+            renderFate();
+            renderFeat();
+            renderEmblemOwn();
+            renderBattle();
+        }
+        function renderBattle() {
+            renderOwnedSummary();
+            renderTurnEffects();
+            renderStatuses();
+            renderEmblems();
+            renderManual();
+            renderOutput();
+        }
+        function refresh() { renderBattle(); renderFate(); save(); }
+
+        // ============================================================
+        // 事件處理
+        // ============================================================
+        function onNameInput(v) { S.name = v; save(); renderProfileBarNameOnly(); }
+        function renderProfileBarNameOnly() {
+            const sel = document.getElementById('profileSelect');
+            const opt = sel.querySelector('option[value="' + store.activeId + '"]');
+            if (opt) opt.textContent = S.name || '（未命名）';
+        }
+        function setAbility(a, v) { S.abilities[a] = parseInt(v) || 0; refresh(); }
+        function setKey(k, v) { S[k] = v; save(); }
+        function setNum(k, v) { S[k] = parseInt(v) || 0; refresh(); }
+        function setBool(k, v) { S[k] = !!v; refresh(); }
+        function setManual(k, v) { S.manual[k] = parseInt(v) || 0; renderOutput(); save(); }
+        function setEssence(name) {
+            S.essence = name;
+            S.essenceExtras = [];
+            S.talent = name && ESSENCES[name] ? ESSENCES[name].talents[0].name : '';
+            S.turnOn = {}; S.turnInputs = {}; S.turnChoices = {};
+            renderAll(); save();
+        }
+        function setForm(name) {
+            S.form = name;
+            S.formExtras = [];
+            if (!name || !FORMS[name]) { S.dmgAbility = ''; }
+            else if (!FORMS[name].abilities.includes(S.dmgAbility)) S.dmgAbility = FORMS[name].abilities[0];
+            S.rengaMode = ''; S.chargeAP = 0; S.assaultMode = ''; S.biteStacks = 0;
+            S.turnOn = {}; S.turnInputs = {}; S.turnChoices = {};
+            renderAll(); save();
+        }
+        function toggleEssenceExtra(name, on) {
+            S.essenceExtras = S.essenceExtras.filter(n => n !== name);
+            if (on) S.essenceExtras.push(name);
+            renderEssence(); refresh();
+        }
+        function toggleFormExtra(name, on) {
+            S.formExtras = S.formExtras.filter(n => n !== name);
+            if (on) S.formExtras.push(name);
+            if (!on) {
+                if (name === '三連牙' && S.rengaMode === '三連牙') S.rengaMode = '';
+                if (name === '無盡咬') S.biteStacks = 0;
+            }
+            renderForm(); refresh();
+        }
+        function toggleAssign(effName, key, on) {
+            let cur = S.assigns[effName] || [];
+            cur = cur.filter(k => k !== key);
+            if (on) {
+                if (cur.length >= 2) { alert('最多只能分配兩項。'); renderEssence(); renderForm(); return; }
+                cur.push(key);
+            }
+            S.assigns[effName] = cur;
+            renderEssence(); renderForm(); refresh();
+        }
+        function toggleTurn(name, on) { S.turnOn[name] = on; refresh(); }
+        function setTurnInput(name, v) { S.turnInputs[name] = parseInt(v) || 0; renderOutput(); save(); }
+        function setTurnChoice(name, v) { S.turnChoices[name] = v; renderOutput(); save(); }
+        function toggleStatus(name, on) { S.statuses[name] = on; refresh(); }
+        function setStatusValue(name, v) { S.statusValues[name] = parseInt(v) || 1; renderOutput(); save(); }
+        function toggleEmblem(name, on) { S.emblemOn[name] = on; refresh(); }
+        function toggleEmblemOwn(name, on) {
+            S.emblems = S.emblems.filter(n => n !== name);
+            if (on) S.emblems.push(name);
+            else delete S.emblemOn[name];
+            renderEmblemOwn(); refresh();
+        }
+
+        function resetTurn() {
+            S.turnOn = {}; S.turnInputs = {}; S.emblemOn = {};
+            S.rengaMode = ''; S.chargeAP = 0; S.assaultMode = ''; S.biteStacks = 0;
+            S.manual = defaultState().manual;
+            refresh();
+        }
+
+        function copyOutput(which, e) {
+            const text = document.getElementById(which === 'hit' ? 'hitOutput' : 'dmgOutput').textContent;
+            const btn = e ? e.target : null;
+            const done = () => {
+                if (btn) {
+                    const t = btn.textContent;
+                    btn.textContent = '已複製';
+                    setTimeout(() => { btn.textContent = t; }, 1000);
+                }
+            };
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(done).catch(() => {});
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); done(); } catch (_) {}
+                document.body.removeChild(ta);
+            }
+        }
+
+        // ============================================================
+        // 初始化與主題同步
+        // ============================================================
+        loadStore();
+        renderAll();
+
+        (function () {
+            function applyTheme(t) {
+                if (t === 'dark') document.documentElement.dataset.theme = 'dark';
+                else delete document.documentElement.dataset.theme;
+            }
+            try { applyTheme(localStorage.getItem('toolbox-theme') || 'light'); } catch (e) {}
+            window.addEventListener('message', function (e) {
+                if (e.data && e.data.type === 'toolbox-theme') applyTheme(e.data.theme);
+            });
+        })();
+    </script>
+</body>
+</html>
